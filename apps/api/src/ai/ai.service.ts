@@ -52,7 +52,7 @@ export class AiService {
       { ...input, ...single },
       briefSnapshot,
       this.config.getOrThrow<string>('AI_MODEL'),
-      this.quota.limit(user.plan, 'TEXT'),
+      this.quota.limit(user.plan),
       start,
       end,
       single ? 1 : 3,

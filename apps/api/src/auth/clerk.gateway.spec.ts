@@ -40,10 +40,20 @@ test('Clerk SDK verifies signatures, expiry and allowed origin without external 
   await expect(gateway.authenticate(`Bearer ${token()}`)).resolves.toEqual({
     clerkId: 'user_local_test',
     plan: 'free',
+    features: [],
   });
   await expect(
     gateway.authenticate(`Bearer ${token({ pla: 'u:pro' })}`),
-  ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'pro' });
+  ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'pro', features: [] });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: 'u:brand_brief,u:unknown_feature' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'pro',
+    features: ['brand_brief'],
+  });
   for (const invalid of [
     token({ azp: 'https://evil.example' }),
     token({ exp: now - 60 }),

@@ -45,7 +45,7 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
         authenticate: (header: string) => {
           const clerkId = header.slice(7);
           if (![a, b].includes(clerkId)) throw new UnauthorizedException();
-          return Promise.resolve({ clerkId, plan: 'free' });
+          return Promise.resolve({ clerkId, plan: 'free', features: [] });
         },
         profile: () => Promise.resolve({ email: null, name: 'Test' }),
       })

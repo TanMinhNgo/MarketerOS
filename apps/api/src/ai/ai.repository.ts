@@ -7,7 +7,7 @@ import {
 import type { GenerateContentInput } from '@marketos/shared';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { textUsage } from './quota.service';
+import { readTextUsage, textUsage } from './quota.service';
 
 @Injectable()
 export class AiRepository {
@@ -61,22 +61,13 @@ export class AiRepository {
           errorCode: 'INTERRUPTED',
         },
       });
-      const where = {
+      const { units, regenerations, used } = await readTextUsage(
+        tx,
         userId,
-        kind: 'TEXT' as const,
-        createdAt: { gte: start, lt: end },
-      };
-      const usage = await tx.generation.aggregate({
-        where,
-        _sum: { quotaUnits: true },
-      });
-      // ponytail: TEXT/1 denotes regeneration; add a discriminator before other single-output TEXT flows.
-      const regenerations = await tx.generation.count({
-        where: { ...where, requestedOutputs: 1 },
-      });
+        start,
+        end,
+      );
       const quotaUnits = requestedOutputs === 1 ? 0 : 1;
-      const units = usage._sum.quotaUnits ?? 0;
-      const used = textUsage(units, regenerations);
       const nextUsed = textUsage(
         units + quotaUnits,
         regenerations + (requestedOutputs === 1 ? 1 : 0),

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClerkClient } from '@clerk/backend';
-import type { PlanKey } from '@marketos/shared';
+import { FeatureKeySchema, type PlanKey } from '@marketos/shared';
 
 @Injectable()
 export class ClerkGateway {
@@ -42,6 +42,9 @@ export class ClerkGateway {
     return {
       clerkId: auth.userId,
       plan,
+      features: FeatureKeySchema.options.filter((feature) =>
+        auth.has({ feature }),
+      ),
     };
   }
 
