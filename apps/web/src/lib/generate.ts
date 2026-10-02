@@ -30,6 +30,26 @@ export const streamRegenerate = (projectId: string, body: GenerateVariantInput, 
 type StreamOptions = { signal?: AbortSignal; onEvent: (e: GenerateEvent) => void };
 
 async function streamSse(path: string, body: unknown, doneSchema: z.ZodType<{ generationId: string; variants: GeneratedVariant[] }>, { signal, onEvent }: StreamOptions): Promise<void> {
+  await postSse(path, body, signal, (event, payload) => {
+    if (event === "variant.delta") {
+      const p = VariantDeltaSchema.safeParse(payload);
+      if (p.success) onEvent({ type: "delta", ...p.data });
+    } else if (event === "variant.done") {
+      const p = VariantDoneSchema.safeParse(payload);
+      if (p.success) onEvent({ type: "variant", ...p.data });
+    } else if (event === "done") {
+      const p = doneSchema.safeParse(payload);
+      if (p.success) onEvent({ type: "done", ...p.data });
+    }
+  });
+}
+
+/**
+ * POST rồi đọc SSE (fetch + ReadableStream, Bearer, `Idempotency-Key` UUID mới mỗi lần), gọi `onEvent` với JSON
+ * đã parse của từng sự kiện. Lỗi trước stream ném ApiError từ request(); sự kiện `error` giữa chừng cũng ném ApiError.
+ * Huỷ bằng AbortSignal thì ném AbortError.
+ */
+export async function postSse(path: string, body: unknown, signal: AbortSignal | undefined, onEvent: (event: string, payload: unknown) => void): Promise<void> {
   const res = await request(path, {
     method: "POST",
     body,
@@ -46,19 +66,10 @@ async function streamSse(path: string, body: unknown, doneSchema: z.ZodType<{ ge
     } catch {
       return; // mảnh hỏng thì bỏ qua, sự kiện `done` vẫn cho dữ liệu đầy đủ
     }
-    if (event === "variant.delta") {
-      const p = VariantDeltaSchema.safeParse(payload);
-      if (p.success) onEvent({ type: "delta", ...p.data });
-    } else if (event === "variant.done") {
-      const p = VariantDoneSchema.safeParse(payload);
-      if (p.success) onEvent({ type: "variant", ...p.data });
-    } else if (event === "done") {
-      const p = doneSchema.safeParse(payload);
-      if (p.success) onEvent({ type: "done", ...p.data });
-    } else if (event === "error") {
+    if (event === "error") {
       const p = ApiErrorSchema.safeParse(payload);
       failure = p.success ? new ApiError(200, p.data.code, p.data.message, p.data.details) : new ApiError(200, "INTERNAL", "Generation failed.");
-    }
+    } else onEvent(event, payload);
   });
 
   const reader = res.body.getReader();
