@@ -34,6 +34,11 @@ describe("Markdown", () => {
   it("chuỗi dài nhiều dấu * vẫn chạy tuyến tính (không backtrack)", () => {
     const start = performance.now();
     html("**a".repeat(20_000));
+    html("[a](x ".repeat(2_000));
     expect(performance.now() - start).toBeLessThan(1000);
+  });
+
+  it("đậm chứa nghiêng", () => {
+    expect(html("**a *b* c**")).toContain("<strong>a <em>b</em> c</strong>");
   });
 });

@@ -29,7 +29,7 @@ const show = (key: string, v: unknown): string => {
   if (v === null || v === undefined || v === "") return "—";
   if (key === "language" && typeof v === "string" && v in LANGUAGES) return LANGUAGES[v as keyof typeof LANGUAGES].label;
   if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
+  return typeof v === "string" ? v : JSON.stringify(v);
 };
 
 function Diff({ label, before, after }: Readonly<{ label: string; before?: string; after: string }>) {

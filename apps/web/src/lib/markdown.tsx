@@ -2,23 +2,54 @@ import { Fragment, type ReactNode } from "react";
 
 // ponytail: chỉ phần Markdown model hay dùng (đoạn, danh sách, tiêu đề, **đậm**, *nghiêng*, `code`, link);
 // cần bảng / code block nhiều dòng thì chuyển sang react-markdown.
-// Lớp ký tự phủ định thay cho `.+?` để regex chạy tuyến tính (không backtrack).
-const INLINE = /\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+const CODE_CLASS = "rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]";
+const LINK_CLASS = "text-primary underline underline-offset-2";
+const HTTP_URL = /^https?:\/\/\S+$/;
+
+/** Token inline bắt đầu tại `i`: [phần tử, vị trí ngay sau token], hoặc null nếu không phải token. */
+// ponytail: quét bằng indexOf thay cho một regex lớn; dấu mở không có dấu đóng sẽ quét tới cuối dòng (O(n²) xấu nhất),
+// chấp nhận được vì mỗi dòng của câu trả lời ngắn.
+function token(text: string, i: number): [ReactNode, number] | null {
+  const c = text[i];
+  const next = text[i + 1];
+  if (c === "`") {
+    const end = text.indexOf("`", i + 1);
+    return end > i + 1 ? [<code key={i} className={CODE_CLASS}>{text.slice(i + 1, end)}</code>, end + 1] : null;
+  }
+  if (c === "*" && next === "*") {
+    const end = text.indexOf("**", i + 2);
+    return end > i + 2 ? [<strong key={i}>{inline(text.slice(i + 2, end))}</strong>, end + 2] : null;
+  }
+  if (c === "*" && next?.trim()) {
+    const end = text.indexOf("*", i + 1);
+    return end > 0 ? [<em key={i}>{inline(text.slice(i + 1, end))}</em>, end + 1] : null;
+  }
+  if (c === "[") {
+    const mid = text.indexOf("](", i + 1);
+    const end = mid > i + 1 ? text.indexOf(")", mid + 2) : -1;
+    const href = text.slice(mid + 2, end);
+    if (end > 0 && HTTP_URL.test(href)) {
+      return [<a key={i} href={href} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>{text.slice(i + 1, mid)}</a>, end + 1];
+    }
+  }
+  return null;
+}
 
 /** Chữ đậm / nghiêng / code / link trong một dòng. Dựng React element, không dùng innerHTML. */
 export function inline(text: string): ReactNode[] {
   const out: ReactNode[] = [];
-  let last = 0;
-  for (const m of text.matchAll(INLINE)) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const k = m.index;
-    if (m[1]) out.push(<strong key={k}>{inline(m[1])}</strong>);
-    else if (m[2]) out.push(<em key={k}>{inline(m[2])}</em>);
-    else if (m[3]) out.push(<code key={k} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">{m[3]}</code>);
-    else out.push(<a key={k} href={m[5]} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">{m[4]}</a>);
-    last = k + m[0].length;
+  let plain = 0; // đầu đoạn chữ thường chưa đẩy vào `out`
+  for (let i = 0; i < text.length; ) {
+    const t = token(text, i);
+    if (t) {
+      if (i > plain) out.push(text.slice(plain, i));
+      out.push(t[0]);
+      i = plain = t[1];
+    } else {
+      i++;
+    }
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (plain < text.length) out.push(text.slice(plain));
   return out;
 }
 
@@ -70,5 +101,5 @@ export function Markdown({ text }: Readonly<{ text: string }>) {
       i += para.length;
     }
   }
-  return <div className="space-y-2 break-words">{blocks}</div>;
+  return <div className="space-y-2 wrap-break-word">{blocks}</div>;
 }
