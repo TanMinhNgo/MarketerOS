@@ -19,6 +19,7 @@ export const BillingUsageResponseSchema = z
       .object({
         projects: UsageCounterSchema,
         text: UsageCounterSchema,
+        assistant: UsageCounterSchema.optional(),
       })
       .strict(),
   })

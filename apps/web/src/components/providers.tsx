@@ -29,7 +29,12 @@ export function Providers({ children }: { children: ReactNode }) {
             retry: (count, e) => !(e instanceof ApiError && e.status >= 400 && e.status < 500) && count < 2,
           },
         },
-        mutationCache: new MutationCache({ onError: onMutationError }),
+        // `meta.silent`: mutation tự hiện lỗi tại chỗ (vd. thẻ hành động của AI Assistant).
+        mutationCache: new MutationCache({
+          onError: (e, _v, _c, m) => {
+            if (!m.meta?.silent) onMutationError(e);
+          },
+        }),
         // Lỗi tải dữ liệu hiển thị tại chỗ trong từng app; chỉ báo toast khi đã có dữ liệu cũ mà làm mới thất bại.
         queryCache: new QueryCache({
           onError: (e, query) => {

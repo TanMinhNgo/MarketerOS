@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { BillingModule } from './billing/billing.module';
+import { AssistantModule } from './assistant/assistant.module';
 import { ProjectsModule } from './projects/projects.module';
 import { BrandModule } from './brand/brand.module';
 import { ContentModule } from './content/content.module';
@@ -23,6 +24,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     UsersModule,
     BillingModule,
+    AssistantModule,
     ProjectsModule,
     BrandModule,
     ContentModule,

@@ -283,8 +283,8 @@ TEXT dùng cùng hàm đếm với reservation: SUM(quotaUnits) + CEIL(số Gene
 TEXT requestedOutputs=1 / 3), theo user và createdAt trong [start,end), mọi status.
 Tạo 3 biến thể tính 1; lần tạo lại 1/4/7 tăng 1, lần 2/3 của nhóm không tăng.
 429 `QUOTA_EXCEEDED` giữ details `{ limit, used, resetAt }`, resetAt=period.end.
-Helper `requireFeature` chuẩn bị 403 `PLAN_REQUIRED`, details `{ feature }`;
-chưa gắn vào route hiện tại. Không cần migration mới.
+Helper `requireFeature` trả 403 `PLAN_REQUIRED`, details `{ feature }`;
+đã dùng cho các route Assistant Phase 7. Riêng Phase 6 không cần migration mới.
 
 Suite `billing.e2e-spec.ts` dùng PostgreSQL test riêng, guard/transaction thật,
 mock ClerkGateway; kiểm tra Free/Pro, create/restore song song, hạ gói, ownership,
@@ -294,3 +294,67 @@ sandbox, phiên Clerk browser hoặc OpenAI thật trong thay đổi billing nà
 
 Tham khảo: [Clerk webhooks](https://clerk.com/docs/guides/development/webhooks/syncing),
 [NestJS rate limiting](https://docs.nestjs.com/security/rate-limiting).
+
+## AI Assistant mức 1 — Phase 7
+
+Chỉ user có plan Pro **và** verified `u:project_aware_ai_assistant`; mọi route kiểm tra
+`requireFeature`/ownership/project active. Không cấp quyền từ PLAN_CATALOG.
+Assistant chỉ đề xuất; không tạo/sửa/duyệt/xóa bài, sửa brief, thực thi lịch hay billing.
+ClerkGateway ánh xạ slug Clerk `project_aware_ai_assistant` thành key public
+`ai_assistant`; features của API, guard, lỗi và contract frontend giữ key public này.
+Toàn bộ 11 key public được ánh xạ tại CLERK_FEATURE_SLUGS trong clerk.gateway.ts.
+Pro dùng entitlement đã verify `everything_in_free` cho Brand Brief, personalization
+và calendar; content/image dùng slug allowance tương ứng Free hoặc Pro. Không cấp
+feature từ plan/catalog. Slug Free plan là `free_user`, API vẫn trả plan `free`.
+
+| Route `/api/projects/:projectId/assistant/messages` | Contract |
+| --- | --- |
+| GET `?limit=20&before=<messageId>` | `{ items, hasMore }`, mới nhất trước; limit 1–100, cursor ID exclusive của cùng project |
+| POST | Body strict `{ content }`, trim 1–4000; header Idempotency-Key UUID; SSE 200 |
+| DELETE | 204, chỉ xóa chat/actions của project; không hoàn quota; hủy reply đang pending |
+| PATCH `/:messageId/actions/:actionId` | Strict `{ status: 'applied' \| 'dismissed' }`; chỉ từ proposed; trả message cập nhật |
+
+SSE: `message.delta { text }` là đoạn thêm vào cuối (append); `done { userMessage,
+assistantMessage }` là kết quả đã lưu; hoặc `error` (ApiError). Message có
+`id, role, content, createdAt, actions`; tin user có actions=[]; assistant tối đa
+12000 ký tự và 5 actions. IDs/status action do server tạo, luôn bắt đầu proposed.
+Lỗi stream/hủy vẫn giữ tin user, không lưu reply chưa hoàn chỉnh. Client dùng
+done làm kết quả chính thức; không coi partial là action đã xác nhận.
+
+Shared schemas/types trong `packages/shared/src/assistant.ts`: input/query/message,
+messages response, delta/done, action union và update status. Action inline fields:
+create_draft (giới hạn CreateContentSchema, không generationId), schedule,
+update_brief (partial không thêm default), edit_content (không status/channel).
+Backend bỏ target ngoài project, schedule DRAFT, edit DONE; draft còn kiểm tra
+variant-validator/luật kênh. PATCH action chỉ ghi nhãn, không chứng minh việc Apply đã xảy ra.
+Frontend thực thi qua API hiện có sau khi người dùng bấm Apply: POST contents
+(không gắn generation ASSISTANT), PATCH contents để edit, schedule cần
+`{ status: 'SCHEDULED', scheduledAt }`, PUT brief sau khi gộp changes vào brief mới nhất.
+Chỉ sau thành công mới PATCH action thành applied; dismissed chỉ đổi nhãn.
+
+Quota riêng **300 tin user/tháng UTC**, chỉ cấu hình cho Pro ở plan-limits.ts.
+Mỗi tin được nhận có một Generation kind ASSISTANT, quotaUnits=1, requestedOutputs=1;
+đếm mọi status trong [start,end), độc lập TEXT. Khóa User→Project, chọn kỳ sau khóa,
+ghi cùng createdAt; UUID unique dùng chung các endpoint generation. Xóa lịch sử/project
+không hoàn quota. `GET /api/billing/usage` thêm optional `usage.assistant { used, limit }`
+khi có Pro + entitlement; bỏ hẳn field khi không có quyền. Không đổi TEXT hay IMAGE/storage.
+
+Migration `20261002040000_assistant`: enum GenerationKind thêm ASSISTANT, bảng
+AssistantMessage + index theo project/createdAt/id và unique generationId/role.
+Messages cascade theo project/Generation; xóa User cascade project/messages/ledger;
+xóa project giữ Generation với projectId=null. Generation không lưu lại chat/brief raw,
+chỉ model/status/token usage; dữ liệu hội thoại chỉ nằm ở AssistantMessage.
+Chạy `npm run db:deploy --workspace api` trước khi dùng backend mới.
+
+Prompt riêng dùng Brand Brief, tên project, 10 bài gần nhất (body cắt 500), 12 tin
+gần nhất (content cắt 1500). Dữ liệu escape `<`, mỗi nguồn trong thẻ riêng, có ngân sách
+ký tự; luật kênh lấy lại channel-prompts hiện có. Trả lời theo ngôn ngữ user; bài đăng
+theo brief.language. Thiếu brief: 404 trước reservation. Không RAG/BullMQ/autonomous tools.
+
+Lỗi: 400 VALIDATION; 401 UNAUTHORIZED; 403 PLAN_REQUIRED `{ feature: 'ai_assistant' }`;
+404 NOT_FOUND (ownership/Trash/cursor/message/action/brief); 409 CONFLICT (key trùng
+hoặc action hết proposed); 429 QUOTA_EXCEEDED `{ limit, used, resetAt }`;
+503 SERVICE_UNAVAILABLE trước stream, hoặc error trong stream. Provider dùng
+OpenAiService/Vercel AI SDK Output.object; đầu ra sai/incomplete không được lưu reply.
+E2E DB thật mock ClerkGateway/OpenAiService, kiểm tra cả quota concurrency/cascade
+và clear đang stream. Chưa gọi OpenAI thật/browser trong triển khai Phase 7 này.

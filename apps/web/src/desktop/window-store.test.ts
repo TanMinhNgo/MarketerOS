@@ -7,10 +7,10 @@ const win = (id: string) => s().windows.find((w) => w.id === id)!;
 beforeEach(() => useWindowStore.setState({ ...initialWindowState, windows: [] }));
 
 describe("open", () => {
-  it("mở app mới với kích thước mặc định của registry", () => {
+  it("mở app mới to hơn kích thước mặc định của registry (×1.25)", () => {
     s().open("trash");
     expect(s().windows).toHaveLength(1);
-    expect(win("trash")).toMatchObject({ w: 560, h: 400, minimized: false, maximized: false });
+    expect(win("trash")).toMatchObject({ w: 700, h: 500, minimized: false, maximized: false });
   });
 
   it("app đã mở thì focus thay vì tạo thêm", () => {
@@ -41,15 +41,15 @@ describe("open", () => {
   });
 
   it("hết chỗ xếp tầng thì quay về góc đầu và vẫn nằm trong vùng", () => {
-    s().setArea(800, 500);
+    s().setArea(1000, 620);
     s().open("trash");
     s().open("settings");
     s().open("projects");
     for (const w of s().windows) {
       expect(w.x).toBeGreaterThanOrEqual(0);
       expect(w.y).toBeGreaterThanOrEqual(0);
-      expect(w.x + w.w).toBeLessThanOrEqual(800);
-      expect(w.y + w.h).toBeLessThanOrEqual(500);
+      expect(w.x + w.w).toBeLessThanOrEqual(1000);
+      expect(w.y + w.h).toBeLessThanOrEqual(620);
     }
     expect(win("projects").x).toBe(win("trash").x);
   });

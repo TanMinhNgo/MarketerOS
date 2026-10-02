@@ -13,7 +13,14 @@ export class BillingService {
   ) {}
   async usage(user: AuthUser): Promise<BillingUsageResponse> {
     const { start, end } = this.quota.period();
-    const counts = await this.billing.usage(user.id, start, end);
+    const includeAssistant =
+      user.plan === 'pro' && user.features.includes('ai_assistant');
+    const counts = await this.billing.usage(
+      user.id,
+      start,
+      end,
+      includeAssistant,
+    );
     const limits = PLAN_LIMITS[user.plan];
     return {
       plan: user.plan,
@@ -22,6 +29,14 @@ export class BillingService {
       usage: {
         projects: { used: counts.projects, limit: limits.projects },
         text: { used: counts.text, limit: limits.text },
+        ...(includeAssistant
+          ? {
+              assistant: {
+                used: counts.assistant!,
+                limit: PLAN_LIMITS.pro.assistant,
+              },
+            }
+          : {}),
       },
     };
   }

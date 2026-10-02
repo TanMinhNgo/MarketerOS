@@ -6,6 +6,17 @@ import { PLAN_LIMITS } from '../billing/plan-limits';
 export const textUsage = (quotaUnits: number, regenerations: number) =>
   quotaUnits + Math.ceil(regenerations / 3);
 
+export function readAssistantUsage(
+  db: Prisma.TransactionClient,
+  userId: string,
+  start: Date,
+  end: Date,
+) {
+  return db.generation.count({
+    where: { userId, kind: 'ASSISTANT', createdAt: { gte: start, lt: end } },
+  });
+}
+
 export async function readTextUsage(
   db: Prisma.TransactionClient,
   userId: string,

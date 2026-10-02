@@ -12,6 +12,7 @@ const SHIPPED = [
   "Content Studio: AI writes 3 post variants per request, in the brief's voice and language",
   "Review and approve drafts, then schedule them on the Content Calendar",
   "Free and Pro plans with usage limits, checkout and billing history",
+  "AI Assistant (Pro): chat per project, with suggested drafts, edits and schedules you apply in one click",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
 ];

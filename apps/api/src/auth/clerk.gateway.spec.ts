@@ -47,7 +47,16 @@ test('Clerk SDK verifies signatures, expiry and allowed origin without external 
   ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'pro', features: [] });
   await expect(
     gateway.authenticate(
-      `Bearer ${token({ pla: 'u:pro', fea: 'u:brand_brief,u:unknown_feature' })}`,
+      `Bearer ${token({ pla: 'o:pro', fea: 'o:project_aware_ai_assistant' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'free',
+    features: [],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: 'u:brand_brief_for_each_project,u:unknown_feature' })}`,
     ),
   ).resolves.toEqual({
     clerkId: 'user_local_test',
@@ -56,13 +65,88 @@ test('Clerk SDK verifies signatures, expiry and allowed origin without external 
   });
   await expect(
     gateway.authenticate(
-      `Bearer ${token({ pla: 'o:pro', fea: 'o:brand_brief' })}`,
+      `Bearer ${token({ pla: 'u:pro', fea: 'o:brand_brief,o:project_aware_ai_assistant' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'pro',
+    features: [],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: 'u:project_aware_ai_assistant' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'pro',
+    features: ['ai_assistant'],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: 'u:ai_assistant' })}`,
+    ),
+  ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'pro', features: [] });
+  const freeSlugs = [
+    'up_to_3_projects',
+    'basic_ai_content_generation_allowance',
+    'trial_ai_image_generation_allowance',
+    'up_to_3_content_variations_per_generation',
+    'brand_brief_for_each_project',
+    'personal_preferences_and_references',
+    'content_drafts_and_calendar',
+  ];
+  const proSlugs = [
+    'everything_in_free',
+    'higher_ai_content_and_image_generation_allowances',
+    'increased_project_limit',
+    'up_to_5_content_variations_per_generation',
+    'access_to_advanced_ai_models',
+    'expanded_reference_and_media_storage',
+    'channel_connections_and_scheduled_publishing',
+    'project_aware_ai_assistant',
+    'content_performance_analytics',
+  ];
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:free_user', fea: freeSlugs.map((s) => `u:${s}`).join(',') })}`,
     ),
   ).resolves.toEqual({
     clerkId: 'user_local_test',
     plan: 'free',
-    features: [],
+    features: [
+      'content_generation',
+      'image_generation',
+      'brand_brief',
+      'personalization',
+      'content_calendar',
+    ],
   });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: proSlugs.map((s) => `u:${s}`).join(',') })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'pro',
+    features: [
+      'content_generation',
+      'image_generation',
+      'brand_brief',
+      'personalization',
+      'content_calendar',
+      'more_projects',
+      'strong_model',
+      'expanded_references',
+      'channel_publishing',
+      'ai_assistant',
+      'content_analytics',
+    ],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:pro', fea: proSlugs.map((s) => `o:${s}`).join(',') })}`,
+    ),
+  ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'pro', features: [] });
   for (const invalid of [
     token({ azp: 'https://evil.example' }),
     token({ exp: now - 60 }),

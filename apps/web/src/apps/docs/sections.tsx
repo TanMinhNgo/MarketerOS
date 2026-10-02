@@ -239,6 +239,32 @@ export const SECTIONS: DocSection[] = [
     ),
   },
   {
+    id: "assistant",
+    title: "AI Assistant",
+    summary: "Chat about a project; apply its suggestions in one click (Pro).",
+    body: (
+      <>
+        <P>The AI Assistant is part of <strong>Pro</strong> and works on the <strong>selected project</strong>. It reads the project&apos;s Brand Brief and its recent posts, and replies in the language you write in.</P>
+        <Steps>
+          <Step title="Open AI Assistant">Double-click its chat-bubble icon. The project needs a Brand Brief.</Step>
+          <Step title="Ask">Type a question or a request, then press Enter (Shift+Enter for a new line). Press Stop to cut a reply short.</Step>
+          <Step title="Review suggestions">Under a reply you may see cards: a new draft, an edit to a post, a schedule, or a Brand Brief change, with what changes.</Step>
+          <Step title="Apply or dismiss">Nothing changes until you press <strong>Apply</strong>. Dismiss hides a suggestion.</Step>
+        </Steps>
+        <Table
+          head={["Suggestion", "What Apply does"]}
+          rows={[
+            ["New draft", "Saves it as Needs review. You still approve it before it can be scheduled."],
+            ["Edit a post", "Updates the post. An approved post goes back to Needs review."],
+            ["Schedule", "Puts an approved post on the calendar, or moves its date. Posts that still need review can't be scheduled."],
+            ["Brand Brief change", "Updates only the fields shown; everything else in the brief stays the same."],
+          ]}
+        />
+        <Callout kind="note">The assistant never approves, deletes or marks posts as Done. Pro includes 300 messages a month; your usage is in Plans &amp; Billing. Clear deletes the project&apos;s chat history but doesn&apos;t give messages back.</Callout>
+      </>
+    ),
+  },
+  {
     id: "trash",
     title: "Trash",
     summary: "Restore projects you removed.",

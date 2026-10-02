@@ -6,7 +6,7 @@ import { requireFeature } from '../auth/require-feature';
 test('only confirmed project and TEXT limits are configured', () => {
   expect(PLAN_LIMITS).toEqual({
     free: { projects: 3, text: 10 },
-    pro: { projects: 20, text: 200 },
+    pro: { projects: 20, text: 200, assistant: 300 },
   });
   expect(
     PlanLimitDetailsSchema.parse({ limit: 3, used: 20, plan: 'free' }),
