@@ -65,6 +65,15 @@ const STICKERS: Record<AppIconName, ReactNode> = {
       ))}
     </>
   ),
+  assistant: (
+    <>
+      <path d="M8 14a8 8 0 0 1 8-8h32a8 8 0 0 1 8 8v22a8 8 0 0 1-8 8H28l-12 11v-11a8 8 0 0 1-8-8z" {...stroke("#B9A6FF")} />
+      <circle cx={22} cy={25} r={3.5} fill={O} />
+      <circle cx={32} cy={25} r={3.5} fill={O} />
+      <circle cx={42} cy={25} r={3.5} fill={O} />
+      <Sparkle cx={53} cy={50} r={9} fill="#FFD84D" />
+    </>
+  ),
   plans: (
     <>
       <rect x={4} y={14} width={56} height={38} rx={8} {...stroke("#3B9CFF")} />

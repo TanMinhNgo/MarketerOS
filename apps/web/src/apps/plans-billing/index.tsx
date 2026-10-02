@@ -55,11 +55,12 @@ function Usage() {
   const { data, isPending, error } = useUsage();
   if (isPending) return <Muted>Loading usage…</Muted>;
   if (error) return <Muted>{errorMessage(error)}</Muted>;
-  const { projects, text } = data.usage;
+  const { projects, text, assistant } = data.usage;
   return (
     <div className="space-y-4">
       <Meter label="Active projects" used={projects.used} limit={projects.limit} hint="Projects in Trash don't count." />
       <Meter label="AI generations this month" used={text.used} limit={text.limit} hint={`One generation writes 3 variants; every 3 single-variant regenerates count as 1. Resets ${fmt(new Date(data.period.end))}.`} />
+      {assistant && <Meter label="AI Assistant messages this month" used={assistant.used} limit={assistant.limit} hint={`Messages you send to the assistant. Resets ${fmt(new Date(data.period.end))}.`} />}
     </div>
   );
 }
@@ -120,7 +121,7 @@ function CurrentPlan() {
 
       {isPaid && !endsAt && next && <Muted>Next payment of {next.amount.amountFormatted} on {fmt(next.date)}.</Muted>}
       {isPaid && endsAt && <Muted>You keep {planName} features until {fmt(endsAt)}; you won&apos;t be charged again.</Muted>}
-      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade for 20 projects and 200 AI generations a month.</Muted>}
+      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade for 20 projects, 200 AI generations and the AI Assistant (300 messages) a month.</Muted>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(!isPaid || endsAt) && pro && (

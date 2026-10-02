@@ -5,6 +5,7 @@ export type AppIconName =
   | "brief"
   | "studio"
   | "calendar"
+  | "assistant"
   | "plans"
   | "trash"
   | "settings"
@@ -70,6 +71,16 @@ export const apps = [
     defaultSize: { w: 1000, h: 640 },
     position: "left",
     component: () => import("./content-calendar"),
+  },
+  {
+    id: "ai-assistant",
+    title: "AI Assistant",
+    description: "Chat about a project with an AI that knows its Brand Brief and posts (Pro).",
+    icon: "assistant",
+    route: "/apps/ai-assistant",
+    defaultSize: { w: 720, h: 640 },
+    position: "left",
+    component: () => import("./ai-assistant"),
   },
   {
     id: "media-library",

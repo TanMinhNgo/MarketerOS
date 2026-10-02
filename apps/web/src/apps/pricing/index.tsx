@@ -22,7 +22,7 @@ const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Statu
   strong_model: { label: "Advanced AI models", blurb: "A stronger model for longer, more nuanced writing.", status: "soon" },
   expanded_references: { label: "Expanded reference storage", blurb: "Keep more brand material close to the AI.", status: "soon" },
   channel_publishing: { label: "Channels and scheduled publishing", blurb: "Connect social channels and publish on schedule.", status: "soon" },
-  ai_assistant: { label: "Project-aware AI assistant", blurb: "Ask questions about a project and get answers grounded in its brief.", status: "soon" },
+  ai_assistant: { label: "Project-aware AI assistant", blurb: "Chat about a project; it suggests drafts, edits, schedules and brief changes you apply in one click. 300 messages a month.", status: "now" },
   content_analytics: { label: "Content performance analytics", blurb: "See what is working across channels.", status: "soon" },
 };
 
@@ -42,7 +42,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   { q: "Can I cancel?", a: "Yes, any time from Plans & Billing. You keep Pro until the end of the period you already paid for, and you are not charged again." },
   { q: "Do you store my card details?", a: "No. Card details are handled by Stripe through Clerk's billing, so MarketOS never sees them." },
   { q: "Where can I see my payments?", a: "In Plans & Billing, under Billing history, with the date, amount and status of every charge." },
-  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation and the Content Calendar are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
+  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation, the Content Calendar and (on Pro) the AI Assistant are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
   { q: "What are the usage limits?", a: "Free: 3 active projects and 10 AI generations a month. Pro: 20 active projects and 200 AI generations a month. One generation writes 3 variants, and every 3 single-variant regenerates count as 1. Generations reset on the 1st of each month (UTC); projects in Trash don't count. You can see your usage in Plans & Billing." },
   { q: "Is there a team or student plan?", a: "Not yet. There are two plans for now: Free and Pro." },
 ];
@@ -219,7 +219,7 @@ export default function App() {
       <Section id="pricing-limits" title="About limits" intro="We would rather be clear than clever.">
         <ul className="space-y-1 text-sm leading-relaxed">
           <li><strong>Free:</strong> 3 active projects and 10 AI generations a month.</li>
-          <li><strong>Pro:</strong> 20 active projects and 200 AI generations a month.</li>
+          <li><strong>Pro:</strong> 20 active projects, 200 AI generations and 300 AI Assistant messages a month.</li>
         </ul>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Every generation writes 3 variants on both plans. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. Limits for images and storage will be published here before those features launch.
