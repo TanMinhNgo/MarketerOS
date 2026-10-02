@@ -4,6 +4,7 @@ import { loadLayout } from "./layout-storage";
 
 export const MIN_W = 360;
 export const MIN_H = 240;
+const OPEN_SCALE = 1.25;
 const CASCADE = 30;
 const ORIGIN = 32;
 
@@ -70,7 +71,8 @@ const createWindowStore = () =>
         rect = fitRect(saved, s.area); // layout lần trước, kẹp lại theo viewport hiện tại
       } else {
         const last = s.windows.at(-1);
-        const { w, h } = fitRect({ x: 0, y: 0, ...app.defaultSize }, s.area);
+        // Mở to hơn defaultSize; màn hình nhỏ thì fitRect kẹp lại vừa khu vực desktop.
+        const { w, h } = fitRect({ x: 0, y: 0, w: app.defaultSize.w * OPEN_SCALE, h: app.defaultSize.h * OPEN_SCALE }, s.area);
         let x = last ? last.x + CASCADE : ORIGIN;
         let y = last ? last.y + CASCADE : ORIGIN;
         // Hết chỗ xếp tầng thì quay về góc đầu thay vì dồn vào mép.
