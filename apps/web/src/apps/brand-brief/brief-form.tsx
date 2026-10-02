@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { UpsertBrandBriefSchema, type BrandBriefResponse } from "@marketos/shared";
 import { Controller, useForm, type FieldError } from "react-hook-form";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import type { z } from "zod";
 import { ColorList } from "@/components/color-list";
 import { StringList } from "@/components/string-list";
@@ -11,7 +11,9 @@ import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LANGUAGE_CODES, LANGUAGES } from "@/lib/languages";
 import { useSaveBrief } from "@/lib/queries";
 
 type In = z.input<typeof UpsertBrandBriefSchema>;
@@ -21,6 +23,8 @@ const toForm = (b: BrandBriefResponse | null): In => ({
   product: b?.product ?? "",
   audience: b?.audience ?? "",
   tone: b?.tone ?? "",
+  language: b?.language ?? "vi",
+  businessAddress: b?.businessAddress ?? null,
   keyMessages: b?.keyMessages ?? [],
   avoidWords: b?.avoidWords ?? [],
   samplePosts: b?.samplePosts ?? [],
@@ -51,7 +55,7 @@ export function BriefForm({ projectId, brief }: { projectId: string; brief: Bran
     save.mutate(values, {
       onSuccess: (saved) => {
         reset(toForm(saved));
-        toast.success("Brand Brief saved");
+        notify.success("Brand Brief saved", { description: "Content Studio will write in this voice from now on.", persist: true, appId: "brand-brief" });
       },
     }),
   );
@@ -66,6 +70,25 @@ export function BriefForm({ projectId, brief }: { projectId: string; brief: Bran
       </Field>
       <Field label="Tone of voice" htmlFor="bb-tone" hint="Example: friendly, approachable, a little humorous" error={errors.tone}>
         <Input id="bb-tone" aria-invalid={!!errors.tone} {...register("tone")} />
+      </Field>
+      <Field label="Content language" htmlFor="bb-language" hint="The AI writes every post in this language, on every channel." error={errors.language}>
+        <Controller
+          control={control}
+          name="language"
+          render={({ field }) => (
+            <Select value={field.value ?? "vi"} onValueChange={field.onChange}>
+              <SelectTrigger id="bb-language" className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {LANGUAGE_CODES.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    {LANGUAGES[code].label}
+                    {LANGUAGES[code].native !== LANGUAGES[code].label && <span className="text-muted-foreground"> · {LANGUAGES[code].native}</span>}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </Field>
       <Field label="Key messages" htmlFor="bb-key" hint="Type, then press Enter to add" error={errors.keyMessages as FieldError | undefined}>
         <Controller control={control} name="keyMessages" render={({ field }) => <TagInput id="bb-key" value={field.value ?? []} onChange={field.onChange} placeholder="Add a message…" />} />
@@ -84,6 +107,14 @@ export function BriefForm({ projectId, brief }: { projectId: string; brief: Bran
           control={control}
           name="visualStyle"
           render={({ field }) => <Textarea id="bb-visual" rows={2} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.trim() ? e.target.value : null)} />}
+        />
+      </Field>
+
+      <Field label="Business address (optional)" htmlFor="bb-address" hint="Shown in the footer of email content. Leave empty if you don't send email." error={errors.businessAddress}>
+        <Controller
+          control={control}
+          name="businessAddress"
+          render={({ field }) => <Textarea id="bb-address" rows={2} maxLength={300} placeholder="e.g. 24 Hàng Bạc, Hoàn Kiếm, Hà Nội" aria-invalid={!!errors.businessAddress} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value)} />}
         />
       </Field>
 

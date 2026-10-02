@@ -1,16 +1,17 @@
 "use client";
 
-import { GenerateContentInputSchema, type GeneratedVariant } from "@marketos/shared";
+import { GenerateContentInputSchema, type ContentLanguage, type GeneratedVariant } from "@marketos/shared";
 import { Sparkles, Square } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useRef, useState } from "react";
+import { notify } from "@/lib/notify/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useWindowStore } from "@/desktop/window-store";
+import { selectFocusedId, useWindowStore } from "@/desktop/window-store";
 import { errorMessage } from "@/lib/api-client";
+import { LANGUAGES } from "@/lib/languages";
 import { useSaveContent } from "@/lib/queries";
 import { CHANNELS, type ChannelValue } from "./channels";
 import { DraftsPanel } from "./drafts-panel";
@@ -31,7 +32,8 @@ function GenerationError({ error, onRetry }: { error: unknown; onRetry: () => vo
   );
 }
 
-export function Studio({ projectId, projectName }: { projectId: string; projectName: string }) {
+export function Studio({ projectId, projectName, language }: { projectId: string; projectName: string; language: ContentLanguage }) {
+  const openApp = useWindowStore((s) => s.open);
   const [channel, setChannel] = useState<ChannelValue>("FACEBOOK");
   const [goal, setGoal] = useState("");
   const [topic, setTopic] = useState("");
@@ -39,6 +41,23 @@ export function Studio({ projectId, projectName }: { projectId: string; projectN
   const [formError, setFormError] = useState<string | null>(null);
   const { state, generate, stop, isStreaming } = useGeneration(projectId);
   const save = useSaveContent(projectId);
+  const watching = useWindowStore((s) => selectFocusedId(s) === "content-studio");
+  const notified = useRef(0);
+
+  // Báo khi tạo xong hoặc lỗi lúc người dùng không nhìn cửa sổ này (thu nhỏ, cửa sổ khác ở trên, tab ẩn).
+  useEffect(() => {
+    if ((state.status !== "done" && state.status !== "error") || notified.current === state.run) return;
+    notified.current = state.run;
+    const away = !watching || document.hidden;
+    const action = { label: "Open Content Studio", appId: "content-studio" };
+    if (state.status === "done") {
+      notify.success("Your 3 variants are ready", { description: `For ${projectName}. Review and save the ones you like.`, action, persist: true, os: true, silent: !away });
+    } else if (isQuotaError(state.error)) {
+      notify.warning("Generation limit reached", { description: "Upgrade or try again later.", action: { label: "See plans", appId: "pricing" }, persist: true, silent: !away });
+    } else {
+      notify.error("Content generation failed", { description: errorMessage(state.error), action, persist: true, os: true, silent: !away });
+    }
+  }, [state.status, state.run, state.error, watching, projectName]);
 
   const run = () => {
     const parsed = GenerateContentInputSchema.safeParse({ channel, goal, topic, ...(notes.trim() ? { notes } : {}) });
@@ -50,7 +69,7 @@ export function Studio({ projectId, projectName }: { projectId: string; projectN
   const saveVariant = async (v: GeneratedVariant) => {
     await save
       .mutateAsync({ channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId: state.generationId })
-      .then(() => toast.success("Saved to drafts"))
+      .then(() => notify.success("Saved to drafts", { description: "Find it in Saved drafts and on the Content Calendar." }))
       .catch(() => {
         // lỗi đã hiện bằng toast từ MutationCache; ném lại để thẻ không báo "đã lưu"
         throw new Error("save failed");
@@ -63,7 +82,12 @@ export function Studio({ projectId, projectName }: { projectId: string; projectN
         <div className="min-w-0 space-y-5">
           <header>
             <h2 className="font-display text-xl font-bold">Content Studio</h2>
-            <p className="text-sm text-muted-foreground">Writing for <strong>{projectName}</strong>, in the voice of its Brand Brief.</p>
+            <p className="text-sm text-muted-foreground">
+              Writing for <strong>{projectName}</strong> in <strong>{LANGUAGES[language].label}</strong>, in the voice of its Brand Brief.{" "}
+              <button type="button" onClick={() => openApp("brand-brief")} className="font-medium text-primary underline-offset-2 hover:underline">
+                Change
+              </button>
+            </p>
           </header>
 
           <form

@@ -40,7 +40,7 @@ function StudioWithBrief({ projectId, name }: { projectId: string; name: string 
         </div>
       </Message>
     );
-  return <Studio projectId={projectId} projectName={name} />;
+  return <Studio projectId={projectId} projectName={name} language={data.language} />;
 }
 
 function StudioApp() {

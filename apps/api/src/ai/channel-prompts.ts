@@ -117,7 +117,7 @@ export const channelPrompts: Record<Channel, ChannelPromptSpec> = {
     role: 'Bạn viết email marketing cho người đã đăng ký nhận tin.',
     format: [
       'Title = subject dưới 50 ký tự, một lời hứa cụ thể; body bắt đầu bằng 1 dòng preview (dưới 90 ký tự, nối tiếp subject, không lặp), rồi lời chào, 2–3 đoạn ngắn, đúng 1 CTA dạng nút ở trường cta riêng.',
-      'Cuối thư có chân thư: tên doanh nghiệp, địa chỉ liên hệ lấy từ brief (nếu thiếu dùng đúng chuỗi "[Địa chỉ doanh nghiệp]") và dòng hủy đăng ký dùng đúng chuỗi "{{unsubscribe_link}}".',
+      'Cuối thư có chân thư: tên doanh nghiệp dùng đúng chuỗi "[Tên doanh nghiệp]", địa chỉ liên hệ lấy từ brief (nếu thiếu dùng đúng chuỗi "[Địa chỉ doanh nghiệp]") và dòng hủy đăng ký dùng đúng chuỗi "{{unsubscribe_link}}".',
     ],
     policy: [
       'Subject không lừa dối (không giả "Re:"/"Fwd:", không hứa thứ email không có); không toàn chữ hoa, không nhiều dấu chấm than, không từ khoá spam kiểu "MIỄN PHÍ!!!"; luôn có cách hủy đăng ký và danh tính người gửi rõ ràng; không bịa ưu đãi.',

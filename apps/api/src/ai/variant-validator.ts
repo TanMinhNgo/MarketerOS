@@ -37,6 +37,7 @@ export function validateVariants(
   variants: GeneratedVariant[],
   channel: Channel,
   avoidWords: string[],
+  businessAddress: string | null = null,
 ): string[] {
   const spec = channelPrompts[channel];
   const { limits } = spec;
@@ -96,8 +97,11 @@ export function validateVariants(
         errors.push(`${field('body')} preview phải dưới 90 ký tự.`);
       if (!variant.body.includes('{{unsubscribe_link}}'))
         errors.push(`${field('body')} thiếu {{unsubscribe_link}}.`);
-      if (!variant.body.includes('[Địa chỉ doanh nghiệp]'))
-        errors.push(`${field('body')} thiếu [Địa chỉ doanh nghiệp].`);
+      const address = businessAddress ?? '[Địa chỉ doanh nghiệp]';
+      if (!variant.body.includes(address))
+        errors.push(`${field('body')} thiếu ${address}.`);
+      if (!variant.body.includes('[Tên doanh nghiệp]'))
+        errors.push(`${field('body')} thiếu [Tên doanh nghiệp].`);
     }
   }
   return errors;

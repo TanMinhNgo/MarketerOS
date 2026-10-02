@@ -1,20 +1,51 @@
 "use client";
 
 import { UpdateContentSchema, type ContentResponse } from "@marketos/shared";
-import { Copy, FileText, Pencil, Trash2 } from "lucide-react";
+import { CircleCheck, Copy, FileText, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { errorMessage } from "@/lib/api-client";
+import { STATUS_LABEL } from "@/lib/calendar-api";
 import { useContents, useDeleteContent, useUpdateContent } from "@/lib/queries";
+import { cn } from "@/lib/utils";
+import { allChecked, ApproveChecklist } from "./approve-checklist";
 import { channelLabel, variantToText } from "./channels";
 import { copyText } from "./variant-card";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
+const STATUS_STYLE = { DRAFT: "bg-amber-500/15 text-amber-700 dark:text-amber-300", READY: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", SCHEDULED: "bg-primary/15 text-primary", DONE: "bg-muted text-muted-foreground" } as const;
+
+function ApproveDialog({ projectId, item, onClose }: { projectId: string; item: ContentResponse; onClose: () => void }) {
+  const update = useUpdateContent(projectId);
+  const [checks, setChecks] = useState<boolean[]>([]);
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Approve for publishing</DialogTitle>
+          <DialogDescription>{channelLabel(item.channel)} · {item.title}</DialogDescription>
+        </DialogHeader>
+        <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-sm">{item.body}</p>
+        <ApproveChecklist item={item} value={checks} onChange={setChecks} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            disabled={!allChecked(checks) || update.isPending}
+            onClick={() => update.mutate({ id: item.id, status: "READY" }, { onSuccess: () => { notify.success("Approved", { description: "Ready to schedule.", action: { label: "Open calendar", appId: "content-calendar" } }); onClose(); } })}
+          >
+            {update.isPending ? "Approving…" : "Approve"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function EditDialog({ projectId, item, onClose }: { projectId: string; item: ContentResponse; onClose: () => void }) {
   const update = useUpdateContent(projectId);
@@ -28,7 +59,7 @@ function EditDialog({ projectId, item, onClose }: { projectId: string; item: Con
     e.preventDefault();
     const parsed = UpdateContentSchema.safeParse({ title, body, hashtags, cta: cta.trim() ? cta.trim() : null });
     if (!parsed.success) return setError("Title and text can't be empty.");
-    update.mutate({ id: item.id, ...parsed.data }, { onSuccess: () => { toast.success("Draft updated"); onClose(); } });
+    update.mutate({ id: item.id, ...parsed.data }, { onSuccess: () => { notify.success("Draft updated"); onClose(); } });
   };
 
   return (
@@ -37,7 +68,10 @@ function EditDialog({ projectId, item, onClose }: { projectId: string; item: Con
         <form onSubmit={submit} className="space-y-3">
           <DialogHeader>
             <DialogTitle>Edit draft</DialogTitle>
-            <DialogDescription>{channelLabel(item.channel)} draft</DialogDescription>
+            <DialogDescription>
+              {channelLabel(item.channel)} draft
+              {item.status !== "DRAFT" && " · Saving changes sends it back for review; approve it again to publish."}
+            </DialogDescription>
           </DialogHeader>
           <Input aria-label="Title" value={title} maxLength={200} onChange={(e) => { setTitle(e.target.value); setError(null); }} />
           <Textarea aria-label="Text" value={body} rows={8} maxLength={10000} onChange={(e) => { setBody(e.target.value); setError(null); }} />
@@ -59,6 +93,7 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
   const { data, isPending, error, refetch } = useContents(projectId);
   const remove = useDeleteContent(projectId);
   const [editing, setEditing] = useState<ContentResponse | null>(null);
+  const [approving, setApproving] = useState<ContentResponse | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   return (
@@ -80,7 +115,7 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
           <li key={c.id} className="rounded-xl border p-3">
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">{channelLabel(c.channel)}</span>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.status}</span>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", STATUS_STYLE[c.status])}>{STATUS_LABEL[c.status]}</span>
               <div className="flex-1" />
               <span className="text-xs text-muted-foreground">{when.format(new Date(c.createdAt))}</span>
             </div>
@@ -90,7 +125,12 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
               <Button variant="ghost" size="icon-sm" aria-label={`Copy ${c.title}`} onClick={() => copyText(variantToText({ title: c.title, body: c.body, hashtags: c.hashtags, cta: c.cta ?? "" }))}>
                 <Copy />
               </Button>
-              <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.title}`} onClick={() => setEditing(c)}>
+              {c.status === "DRAFT" && (
+                <Button variant="outline" size="sm" onClick={() => setApproving(c)}>
+                  <CircleCheck /> Approve
+                </Button>
+              )}
+              <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.title}`} title={c.status === "DONE" ? "Published content can't be edited" : undefined} disabled={c.status === "DONE"} onClick={() => setEditing(c)}>
                 <Pencil />
               </Button>
               {confirmId === c.id ? (
@@ -98,7 +138,7 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
                   variant="destructive"
                   size="sm"
                   disabled={remove.isPending}
-                  onClick={() => remove.mutate(c.id, { onSuccess: () => { setConfirmId(null); toast.success("Draft deleted"); } })}
+                  onClick={() => remove.mutate(c.id, { onSuccess: () => { setConfirmId(null); notify.success("Draft deleted"); } })}
                 >
                   Confirm delete
                 </Button>
@@ -111,6 +151,7 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
           </li>
         ))}
       </ul>
+      {approving && <ApproveDialog projectId={projectId} item={approving} onClose={() => setApproving(null)} />}
       {editing && <EditDialog projectId={projectId} item={editing} onClose={() => setEditing(null)} />}
     </aside>
   );

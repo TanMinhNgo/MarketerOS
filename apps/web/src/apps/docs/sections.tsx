@@ -25,7 +25,7 @@ export const SECTIONS: DocSection[] = [
           <Step title="Create an account">Sign up with Google or email so your work is saved to you.</Step>
           <Step title="Create a project">A project is a folder for one brand, client or campaign.</Step>
           <Step title="Fill in its Brand Brief">Tell the AI who you sell to and how you sound.</Step>
-          <Step title="Generate and schedule content">Content Studio and Content Calendar build on the brief. They are coming soon (see About).</Step>
+          <Step title="Generate and schedule content">Content Studio writes drafts from the brief. Review and approve each one, then drag it onto a day in Content Calendar.</Step>
         </Steps>
         <Callout kind="tip">Everything has its own link. Paste a link such as <code>/apps/projects</code> into a new tab and that app opens straight away.</Callout>
       </>
@@ -184,11 +184,13 @@ export const SECTIONS: DocSection[] = [
             ["Product / service", "What you sell and what makes it different."],
             ["Target audience", "Who buys it: age, interests, problems."],
             ["Tone of voice", "For example: friendly, approachable, a little humorous."],
+            ["Content language", "The language the AI writes in for every channel. Vietnamese by default."],
             ["Key messages", "The points every post should reinforce. Type one, press Enter to add the next (up to 20)."],
             ["Words to avoid", "Terms the AI must never use (up to 100)."],
             ["Sample posts", "Paste posts you love so the AI can copy the style (up to 10)."],
             ["Brand colors", "Pick a colour and press Add color (up to 10)."],
             ["Visual style", "Describe the look of your imagery."],
+            ["Business address (optional)", "Used in the footer of email content. Leave it empty if you don't send email; the AI then leaves a placeholder for you to fill in."],
           ]}
         />
         <Callout kind="note">Product, audience and tone are required. Red messages under a field tell you what to fix.</Callout>
@@ -233,6 +235,33 @@ export const SECTIONS: DocSection[] = [
           ]}
         />
         <Callout kind="note">Billing is handled by Clerk and Stripe, so card details never touch MarketOS.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "notifications",
+    title: "Notifications",
+    summary: "Toasts, the bell and posting reminders.",
+    body: (
+      <>
+        <P>Short messages slide in at the bottom right after an action, with a button to jump to the right app when it helps. Important ones are also kept in the bell at the top right.</P>
+        <H>The bell</H>
+        <Table
+          head={["You will find", "When"]}
+          rows={[
+            ["Your 3 variants are ready", "AI finished writing while Content Studio was minimized, behind another window or in another tab."],
+            ["Posting reminders", "A summary of today's scheduled posts, and a reminder 15 minutes before each one."],
+            ["Account updates", "A project moved to Trash or restored, a Brand Brief saved, a plan cancelled."],
+          ]}
+        />
+        <Steps>
+          <Step title="Open a notification">Click it to open the related app. It is marked as read.</Step>
+          <Step title="Tidy up">Use Mark all read, or Clear all at the bottom of the list.</Step>
+          <Step title="Change settings">Press the settings icon in the bell to turn reminders or desktop notifications on or off.</Step>
+        </Steps>
+        <H>Desktop notifications</H>
+        <P>Turn on Desktop notifications in the bell settings and allow them when your browser asks. You will then get a notice on your computer when content is ready or a post is due, but only while MarketOS is in a background tab.</P>
+        <Callout kind="note">Reminders follow the project you have selected, and only cover approved posts that are on the calendar.</Callout>
       </>
     ),
   },

@@ -17,6 +17,7 @@ const user = { id: 'user_1', plan: 'free' } as AuthUser;
 const prepared = {
   generationId: 'gen_1',
   channel: 'FACEBOOK' as const,
+  businessAddress: null,
   avoidWords: [],
   system: 'system',
   prompt: 'prompt',
@@ -32,6 +33,8 @@ function setup(
       product: 'Shop',
       audience: 'Người mới',
       tone: 'Thân thiện',
+      language: 'vi',
+      businessAddress: null,
       keyMessages: [],
       avoidWords: [],
       samplePosts: [],

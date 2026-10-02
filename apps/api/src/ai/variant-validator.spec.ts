@@ -16,7 +16,7 @@ const base: Record<Channel, GeneratedVariant> = {
   LINKEDIN: variant(repeat(100)),
   YOUTUBE: variant('Mô tả video'),
   EMAIL: variant(
-    'Preview ngắn\nXin chào,\nNội dung email.\nTên doanh nghiệp\n[Địa chỉ doanh nghiệp]\n{{unsubscribe_link}}',
+    'Preview ngắn\nXin chào,\nNội dung email.\n[Tên doanh nghiệp]\n[Địa chỉ doanh nghiệp]\n{{unsubscribe_link}}',
   ),
   BLOG: variant(repeat(500), ['ThẻMột', 'ThẻHai']),
 };
@@ -139,6 +139,26 @@ test('email footer and unsubscribe placeholder are required', () => {
   expect(
     check('EMAIL', { body: 'Preview\n{{unsubscribe_link}}' }).join(' '),
   ).toContain('thiếu [Địa chỉ doanh nghiệp]');
+  const withAddress = {
+    ...base.EMAIL,
+    body: 'Preview\n[Tên doanh nghiệp]\n123 Test St\n{{unsubscribe_link}}',
+  };
+  expect(
+    validateVariants(
+      [withAddress, withAddress, withAddress],
+      'EMAIL',
+      [],
+      '123 Test St',
+    ),
+  ).toEqual([]);
+  expect(
+    validateVariants(
+      [base.EMAIL, base.EMAIL, base.EMAIL],
+      'EMAIL',
+      [],
+      '123 Test St',
+    ).join(' '),
+  ).toContain('thiếu 123 Test St');
 });
 
 test('facebook first line must be a short hook', () => {

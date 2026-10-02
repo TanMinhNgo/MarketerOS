@@ -4,6 +4,7 @@ import { Logo } from "./AppIcon";
 import { MenuNav } from "./MenuNav";
 import { OpenAppButton } from "./OpenAppButton";
 import { SearchButton } from "./search/SearchButton";
+import { NotificationBell } from "./notifications/NotificationBell";
 import { UserAvatarButton } from "./UserAvatarButton";
 
 export function MenuBar() {
@@ -20,6 +21,7 @@ export function MenuBar() {
       <div className="flex-1" />
       <ActiveProjectPill />
       <SearchButton />
+      <NotificationBell />
       <Show when="signed-out">
         <OpenAppButton appId="sign-in" size="sm" variant="ghost" className="h-7 rounded-full px-3 text-xs font-bold hover:bg-white/30">
           Sign in

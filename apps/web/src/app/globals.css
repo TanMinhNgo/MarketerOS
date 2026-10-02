@@ -85,6 +85,8 @@
 @keyframes flicker { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(0.88, 1.18); } }
 @keyframes wind-wave { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-18px) rotate(-6deg); } 75% { transform: translateY(18px) rotate(6deg); } }
 @keyframes wind-flow { to { stroke-dashoffset: -400; } }
+@keyframes bell-ring { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-4deg); } }
+@keyframes toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @keyframes glow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 @keyframes beam { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
 @keyframes frond { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
@@ -115,6 +117,8 @@
 .flicker { animation: flicker 0.5s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
 .wind-wave { animation: wind-wave 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .wind-flow { animation: wind-flow 4s linear infinite; }
+.toast-progress { animation: toast-progress linear forwards; }
+[data-sonner-toast]:hover .toast-progress { animation-play-state: paused; }
 .glow { animation: glow 0.9s ease-in-out infinite alternate; }
 .beam { animation: beam 7s linear infinite; transform-box: fill-box; transform-origin: 0% 50%; }
 .frond { animation: frond 2.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }

@@ -2,7 +2,7 @@
 
 import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import { AuthGate } from "@/components/auth-gate";
 import { ProjectIcon } from "@/components/project-icon";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ function ProjectsApp() {
     trash.mutate(p.id, {
       onSuccess: () => {
         if (activeId === p.id) setActive(null);
-        toast.success(`Moved "${p.name}" to Trash`, { action: { label: "Undo", onClick: () => restore.mutate(p.id) } });
+        notify.success(`Moved "${p.name}" to Trash`, { description: "You can restore it from Trash at any time.", action: { label: "Undo", onClick: () => restore.mutate(p.id) }, persist: true, appId: "trash" });
       },
     });
 

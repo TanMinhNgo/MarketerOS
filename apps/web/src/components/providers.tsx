@@ -2,9 +2,9 @@
 
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { ApiError, errorMessage } from "@/lib/api-client";
+import { notify } from "@/lib/notify/notify";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -17,11 +17,11 @@ export function Providers({ children }: { children: ReactNode }) {
             retry: (count, e) => !(e instanceof ApiError && e.status >= 400 && e.status < 500) && count < 2,
           },
         },
-        mutationCache: new MutationCache({ onError: (e) => toast.error(errorMessage(e)) }),
+        mutationCache: new MutationCache({ onError: (e) => notify.error(errorMessage(e)) }),
         // Lỗi tải dữ liệu hiển thị tại chỗ trong từng app; chỉ báo toast khi đã có dữ liệu cũ mà làm mới thất bại.
         queryCache: new QueryCache({
           onError: (e, query) => {
-            if (query.state.data !== undefined) toast.error(errorMessage(e));
+            if (query.state.data !== undefined) notify.error(errorMessage(e));
           },
         }),
       }),
@@ -29,7 +29,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
-      <Toaster position="bottom-right" />
+      <Toaster position="bottom-right" offset={{ bottom: 64, right: 16 }} mobileOffset={{ bottom: 16, right: 16, left: 16 }} visibleToasts={4} gap={12} />
     </QueryClientProvider>
   );
 }

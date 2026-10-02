@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiQuery,
@@ -57,6 +58,27 @@ export class ContentController {
     required: false,
     enum: ['DRAFT', 'READY', 'SCHEDULED', 'DONE'],
   })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    format: 'date-time',
+    description: 'Inclusive start; requires to; max 62 days.',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    type: String,
+    format: 'date-time',
+    description: 'Exclusive end; requires from; max 62 days.',
+  })
+  @ApiQuery({
+    name: 'unscheduled',
+    required: false,
+    enum: ['true', 'false'],
+    description:
+      'true filters scheduledAt IS NULL; cannot combine with from/to.',
+  })
   @ApiOkResponse({ schema: apiSchema(ContentListResponseSchema) })
   list(
     @CurrentUser() user: AuthUser,
@@ -90,6 +112,11 @@ export class ContentController {
   @Patch(':contentId')
   @ApiBody({ schema: apiSchema(UpdateContentSchema, 'input') })
   @ApiOkResponse({ schema: apiSchema(ContentResponseSchema) })
+  @ApiConflictResponse({
+    schema: apiSchema(ApiErrorSchema),
+    description:
+      'Invalid status transition or edit of DONE content; details includes current and requested status.',
+  })
   update(
     @CurrentUser() user: AuthUser,
     @Param('projectId') projectId: string,

@@ -79,6 +79,10 @@ export const UpdateContentSchema = contentFields
     cta: true,
   })
   .partial()
+  .extend({
+    status: ContentStatusSchema.optional(),
+    scheduledAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
     message: 'Cần ít nhất một trường cập nhật.',
@@ -88,8 +92,34 @@ export const ContentListQuerySchema = z
     page: z.coerce.number().int().min(1).max(10000).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     status: ContentStatusSchema.optional(),
+    from: z.iso.datetime({ offset: true }).optional(),
+    to: z.iso.datetime({ offset: true }).optional(),
+    unscheduled: z.enum(['true', 'false']).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.from === undefined) !== (value.to === undefined))
+      context.addIssue({
+        code: 'custom',
+        path: [value.from === undefined ? 'from' : 'to'],
+        message: 'from và to phải đi cùng nhau.',
+      });
+    if (value.from && value.to) {
+      const duration = Date.parse(value.to) - Date.parse(value.from);
+      if (duration <= 0 || duration > 62 * 24 * 60 * 60 * 1000)
+        context.addIssue({
+          code: 'custom',
+          path: ['to'],
+          message: 'Khoảng thời gian phải lớn hơn 0 và tối đa 62 ngày.',
+        });
+      if (value.unscheduled === 'true')
+        context.addIssue({
+          code: 'custom',
+          path: ['unscheduled'],
+          message: 'Không thể kết hợp unscheduled=true với from/to.',
+        });
+    }
+  });
 export const ContentResponseSchema = z.object({
   id: z.string(),
   projectId: z.string(),

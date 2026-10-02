@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import { AuthGate } from "@/components/auth-gate";
 import { ProjectIcon } from "@/components/project-icon";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ function TrashApp() {
               size="sm"
               variant="outline"
               disabled={restore.isPending && restore.variables === p.id}
-              onClick={() => restore.mutate(p.id, { onSuccess: () => toast.success(`Restored "${p.name}"`) })}
+              onClick={() => restore.mutate(p.id, { onSuccess: () => notify.success(`Restored "${p.name}"`, { description: "It's back in Projects.", action: { label: "Open Projects", appId: "projects" }, persist: true }) })}
             >
               <RotateCcw /> Restore
             </Button>

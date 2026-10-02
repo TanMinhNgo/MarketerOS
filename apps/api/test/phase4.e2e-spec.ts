@@ -12,7 +12,10 @@ import { OpenAiService } from '../src/ai/openai.service';
 import { AiRepository } from '../src/ai/ai.repository';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { configureApp } from '../src/common/configure-app';
-import { ContentResponseSchema } from '@marketos/shared';
+import {
+  ContentListResponseSchema,
+  ContentResponseSchema,
+} from '@marketos/shared';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 suite('Phase 4 AI and draft content with PostgreSQL', () => {
@@ -26,8 +29,8 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
   const auth = (clerkId: string) => ({ Authorization: `Bearer ${clerkId}` });
   const variant = {
     title: 'Học marketing',
-    body: 'Bắt đầu hành trình của bạn hôm nay.',
-    hashtags: ['marketing'],
+    body: `Bắt đầu hôm nay\n${Array(80).fill('Nội-dung').join(' ')}`,
+    hashtags: ['ThẻMột', 'ThẻHai'],
     cta: 'Tìm hiểu thêm',
   };
   const output = { variants: [variant, variant, variant] };
@@ -204,6 +207,150 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
     await request(app.getHttpServer())
       .get(`${path}/${content.id}`)
       .set(auth(a))
+      .expect(404);
+  });
+
+  it('requires approval before scheduling and re-approval after editing', async () => {
+    const path = `/api/projects/${projectId}/contents`;
+    const created = await request(app.getHttpServer())
+      .post(path)
+      .set(auth(a))
+      .send({ channel: 'FACEBOOK', ...variant })
+      .expect(201);
+    const item = `${path}/${(created.body as { id: string }).id}`;
+    const patch = (data: object) =>
+      request(app.getHttpServer()).patch(item).set(auth(a)).send(data);
+    const updated = async (data: object) =>
+      ContentResponseSchema.parse((await patch(data).expect(200)).body);
+    const conflict = async (data: object) => {
+      const response = await patch(data).expect(409);
+      const error = response.body as { code: string; details: unknown };
+      expect(error.code).toBe('CONFLICT');
+      expect(error.details).toBeTruthy();
+    };
+    const date1 = '2026-10-20T10:00:00.000Z';
+    const date2 = '2026-10-21T10:00:00.000Z';
+
+    await conflict({ status: 'SCHEDULED', scheduledAt: date1 });
+    await conflict({ status: 'DONE' });
+    await conflict({ scheduledAt: date1 });
+    expect((await updated({ status: 'READY' })).status).toBe('READY');
+    await conflict({ status: 'DONE' });
+    await conflict({ status: 'SCHEDULED' });
+    await conflict({ body: 'Edited', status: 'READY' });
+    const scheduled = await updated({
+      status: 'SCHEDULED',
+      scheduledAt: date1,
+    });
+    expect(scheduled).toMatchObject({
+      status: 'SCHEDULED',
+      scheduledAt: date1,
+    });
+    expect(await updated({ scheduledAt: date2 })).toMatchObject({
+      status: 'SCHEDULED',
+      scheduledAt: date2,
+    });
+    await conflict({ status: 'DRAFT' });
+    const done = await updated({ status: 'DONE' });
+    expect(done).toMatchObject({ status: 'DONE', scheduledAt: date2 });
+    await conflict({ title: 'No edit' });
+    await conflict({ status: 'DRAFT' });
+    await conflict({ scheduledAt: null });
+    expect(await updated({ scheduledAt: date1 })).toMatchObject({
+      status: 'DONE',
+      scheduledAt: date1,
+    });
+    expect((await updated({ status: 'SCHEDULED' })).status).toBe('SCHEDULED');
+    expect(await updated({ status: 'READY' })).toMatchObject({
+      status: 'READY',
+      scheduledAt: null,
+    });
+    expect((await updated({ status: 'DRAFT' })).status).toBe('DRAFT');
+    expect((await updated({ status: 'READY' })).status).toBe('READY');
+    expect(await updated({ body: 'Needs review' })).toMatchObject({
+      status: 'DRAFT',
+      scheduledAt: null,
+    });
+    await updated({ status: 'READY' });
+    await updated({ status: 'SCHEDULED', scheduledAt: date2 });
+    expect(await updated({ hashtags: ['review'] })).toMatchObject({
+      status: 'DRAFT',
+      scheduledAt: date2,
+    });
+    await conflict({ status: 'SCHEDULED' });
+    expect(await updated({ status: 'READY' })).toMatchObject({
+      status: 'READY',
+      scheduledAt: null,
+    });
+    await request(app.getHttpServer())
+      .patch(item)
+      .set(auth(b))
+      .send({ status: 'DRAFT' })
+      .expect(404);
+  });
+
+  it('filters the calendar by scheduledAt and returns unscheduled content', async () => {
+    const path = `/api/projects/${projectId}/contents`;
+    const create = async () => {
+      const response = await request(app.getHttpServer())
+        .post(path)
+        .set(auth(a))
+        .send({ channel: 'FACEBOOK', ...variant })
+        .expect(201);
+      return (response.body as { id: string }).id;
+    };
+    const inside = await create();
+    const outside = await create();
+    const noDate = await create();
+    for (const [id, date] of [
+      [inside, '2026-10-20T10:00:00.000Z'],
+      [outside, '2026-11-20T10:00:00.000Z'],
+    ]) {
+      await request(app.getHttpServer())
+        .patch(`${path}/${id}`)
+        .set(auth(a))
+        .send({ status: 'READY' })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`${path}/${id}`)
+        .set(auth(a))
+        .send({ status: 'SCHEDULED', scheduledAt: date })
+        .expect(200);
+    }
+    const filteredResponse = await request(app.getHttpServer())
+      .get(`${path}?from=2026-10-01T00:00:00.000Z&to=2026-11-01T00:00:00.000Z`)
+      .set(auth(a))
+      .expect(200);
+    const filtered = ContentListResponseSchema.parse(filteredResponse.body);
+    expect(filtered.items.map((item) => item.id)).toContain(inside);
+    expect(filtered.items.map((item) => item.id)).not.toContain(outside);
+    expect(filtered.items.map((item) => item.id)).not.toContain(noDate);
+    const unscheduledResponse = await request(app.getHttpServer())
+      .get(`${path}?unscheduled=true`)
+      .set(auth(a))
+      .expect(200);
+    const unscheduled = ContentListResponseSchema.parse(
+      unscheduledResponse.body,
+    );
+    expect(unscheduled.items.map((item) => item.id)).toContain(noDate);
+    expect(unscheduled.items.map((item) => item.id)).not.toContain(inside);
+    await request(app.getHttpServer())
+      .get(`${path}?from=2026-10-01T00:00:00.000Z`)
+      .set(auth(a))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(`${path}?from=2026-10-01T00:00:00.000Z&to=2027-01-01T00:00:00.000Z`)
+      .set(auth(a))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(
+        `${path}?unscheduled=true&from=2026-10-01T00:00:00.000Z&to=2026-11-01T00:00:00.000Z`,
+      )
+      .set(auth(a))
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(`${path}?unscheduled=true`)
+      .set(auth(b))
       .expect(404);
   });
 

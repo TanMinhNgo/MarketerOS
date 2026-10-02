@@ -2,18 +2,20 @@
 
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, pointerWithin, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import type { ContentResponse } from "@marketos/shared";
-import { CalendarDays, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api-client";
-import { SERVER_SCHEDULING, type SchedulePatch } from "@/lib/calendar-api";
+import { mergeById, schedulePatch, type ContentStatus } from "@/lib/calendar-api";
 import { addDays, addMonths, groupByDay, monthGrid, moveToDay, toKey, weekDays } from "@/lib/calendar-utils";
+import { notify } from "@/lib/notify/notify";
 import { cn } from "@/lib/utils";
 import { CHANNELS } from "../content-studio/channels";
 import { channelColor } from "./channel-colors";
 import { ChipPreview, ItemChip } from "./item-chip";
 import { ItemDialog } from "./item-dialog";
-import { useCalendarItems, useReschedule } from "./use-calendar";
+import { useCalendarRange, useReschedule, useUnscheduled } from "./use-calendar";
 
 type View = "month" | "week";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -45,9 +47,9 @@ function Sidebar({ items, onOpen }: { items: ContentResponse[]; onOpen: (i: Cont
   return (
     <aside ref={setNodeRef} aria-label="Unscheduled drafts" className={cn("flex min-h-0 flex-col rounded-2xl border-2 p-3 transition-colors", isOver ? "border-primary bg-primary/10" : "border-[#3B2A4A]/30")}>
       <h3 className="font-display text-sm font-bold">Unscheduled</h3>
-      <p className="mb-2 text-xs text-muted-foreground">Drag a draft onto a day. Drop here to unschedule.</p>
+      <p className="mb-2 text-xs text-muted-foreground">Drag approved content onto a day. Drop here to unschedule.</p>
       <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
-        {items.length === 0 && <p className="text-xs text-muted-foreground">No unscheduled drafts. Create some in Content Studio.</p>}
+        {items.length === 0 && <p className="text-xs text-muted-foreground">Nothing waiting. Create and approve content in Content Studio.</p>}
         {items.map((i) => <ItemChip key={i.id} item={i} onOpen={onOpen} />)}
       </div>
     </aside>
@@ -55,21 +57,31 @@ function Sidebar({ items, onOpen }: { items: ContentResponse[]; onOpen: (i: Cont
 }
 
 export function Calendar({ projectId }: { projectId: string }) {
-  const { data, isPending, error, refetch } = useCalendarItems(projectId);
   const reschedule = useReschedule(projectId);
   const [view, setView] = useState<View>("month");
   const [anchor, setAnchor] = useState(() => new Date());
   const [dragging, setDragging] = useState<ContentResponse | null>(null);
   const [selected, setSelected] = useState<ContentResponse | null>(null);
 
+  const days = useMemo(() => (view === "month" ? monthGrid(anchor.getFullYear(), anchor.getMonth()) : weekDays(anchor)), [view, anchor]);
+  const range = useCalendarRange(projectId, days[0], addDays(days[days.length - 1], 1));
+  const pool = useUnscheduled(projectId);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
-  const items = useMemo(() => data ?? [], [data]);
+  // Gộp hai danh sách: đổi lịch optimistic ở danh sách nào thì mục cũng hiện đúng chỗ (ô ngày hay cột Unscheduled).
+  const items = useMemo(() => mergeById(range.data, pool.data), [range.data, pool.data]);
   const byDay = useMemo(() => groupByDay(items), [items]);
   const unscheduled = useMemo(() => items.filter((i) => !i.scheduledAt), [items]);
-  const days = view === "month" ? monthGrid(anchor.getFullYear(), anchor.getMonth()) : weekDays(anchor);
+  const isPending = range.isPending || pool.isPending;
+  const error = range.error ?? pool.error;
+  const refetch = () => Promise.all([range.refetch(), pool.refetch()]);
   const todayKey = toKey(new Date());
 
-  const move = (id: string, patch: SchedulePatch) => reschedule.mutate({ id, patch });
+  /** Áp luật duyệt trước khi gửi: bài chưa duyệt không lên lịch được. */
+  const move = (item: ContentResponse, status: ContentStatus, scheduledAt: string | null) => {
+    const patch = schedulePatch(item, status, scheduledAt);
+    if (typeof patch === "string") return notify.error(patch, { description: "Approve it in Content Studio or from its details." });
+    if (patch) reschedule.mutate({ id: item.id, patch });
+  };
 
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null);
@@ -77,10 +89,9 @@ export function Calendar({ projectId }: { projectId: string }) {
     const over = e.over?.id;
     if (!item || typeof over !== "string") return;
     if (over === "unscheduled") {
-      if (item.scheduledAt) move(item.id, { status: "DRAFT", scheduledAt: null });
+      move(item, item.status === "DRAFT" ? "DRAFT" : "READY", null);
     } else if (over.startsWith("day:")) {
-      const scheduledAt = moveToDay(item.scheduledAt, over.slice(4));
-      if (scheduledAt !== item.scheduledAt) move(item.id, { status: item.status === "DONE" ? "DONE" : "SCHEDULED", scheduledAt });
+      move(item, item.status === "READY" ? "SCHEDULED" : item.status, moveToDay(item.scheduledAt, over.slice(4)));
     }
   };
 
@@ -119,13 +130,6 @@ export function Calendar({ projectId }: { projectId: string }) {
           </div>
         </header>
 
-        {!SERVER_SCHEDULING && (
-          <p className="flex items-start gap-2 border-b bg-amber-500/10 px-4 py-1.5 text-xs">
-            <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            Schedules are saved on this device for now. They will sync to your account once the server supports scheduling.
-          </p>
-        )}
-
         <div className="grid min-h-0 flex-1 gap-3 p-3 @3xl:grid-cols-[200px_minmax(0,1fr)]">
           <Sidebar items={unscheduled} onOpen={setSelected} />
           <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
@@ -150,8 +154,9 @@ export function Calendar({ projectId }: { projectId: string }) {
         </footer>
       </div>
 
-      <DragOverlay>{dragging && <ChipPreview item={dragging} />}</DragOverlay>
-      {selected && <ItemDialog key={selected.id} item={selected} onClose={() => setSelected(null)} onSave={(patch) => move(selected.id, patch)} />}
+      {/* Cửa sổ dùng transform/backdrop-filter nên `position: fixed` bên trong bị lệch theo cửa sổ: render ra body. */}
+      {typeof document !== "undefined" && createPortal(<DragOverlay zIndex={9999} dropAnimation={null}>{dragging && <ChipPreview item={dragging} />}</DragOverlay>, document.body)}
+      {selected && <ItemDialog key={selected.id} item={selected} onClose={() => setSelected(null)} onSave={(status, scheduledAt) => move(selected, status, scheduledAt)} />}
     </DndContext>
   );
 }

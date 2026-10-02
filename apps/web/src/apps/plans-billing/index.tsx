@@ -3,7 +3,7 @@
 import { CheckoutButton, usePaymentAttempts, usePaymentMethods, usePlans, useSubscription } from "@clerk/nextjs/experimental";
 import { CreditCard, Receipt, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import { AuthGate } from "@/components/auth-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -52,10 +52,10 @@ function CurrentPlan() {
     try {
       await item.cancel({});
       await sub.revalidate();
-      toast.success("Your plan will end at the close of the current billing period.");
+      notify.success("Plan cancelled", { description: "You keep your current features until the end of this billing period.", persist: true, appId: "plans-billing" });
       setConfirming(false);
     } catch {
-      toast.error("Couldn't cancel the plan. Please try again.");
+      notify.error("Couldn't cancel the plan", { description: "Please try again in a moment." });
     } finally {
       setCancelling(false);
     }

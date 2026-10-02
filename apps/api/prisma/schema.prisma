@@ -144,19 +144,21 @@ model Project {
 }
 
 model BrandBrief {
-  id          String   @id @default(cuid())
-  projectId   String   @unique
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  product     String
-  audience    String
-  tone        String
-  keyMessages String[] @default([])
-  avoidWords  String[] @default([])
-  samplePosts String[] @default([])
-  brandColors String[] @default([])
-  visualStyle String?
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product         String
+  audience        String
+  tone            String
+  language        String   @default("vi")
+  businessAddress String?
+  keyMessages     String[] @default([])
+  avoidWords      String[] @default([])
+  samplePosts     String[] @default([])
+  brandColors     String[] @default([])
+  visualStyle     String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model ContentItem {

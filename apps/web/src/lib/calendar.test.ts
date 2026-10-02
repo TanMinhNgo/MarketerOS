@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ContentResponse } from "@marketos/shared";
 
 vi.mock("@clerk/nextjs", () => ({ getToken: vi.fn(async () => "t") }));
 
-import { applyOverlay, loadOverlay, updateSchedule } from "./calendar-api";
+import { findPlaceholders } from "../apps/content-studio/approve-checklist";
+import { mergeById, NEXT_STATUSES, schedulePatch } from "./calendar-api";
 import { addDays, groupByDay, monthGrid, moveToDay, startOfWeek, toKey, weekDays } from "./calendar-utils";
 
 const item = (id: string, scheduledAt: string | null = null): ContentResponse => ({
@@ -43,35 +44,47 @@ describe("calendar-utils", () => {
   });
 });
 
-describe("calendar-api overlay", () => {
-  afterEach(() => vi.unstubAllGlobals());
-  const store = () => {
-    const data: Record<string, string> = {};
-    vi.stubGlobal("localStorage", { getItem: (k: string) => data[k] ?? null, setItem: (k: string, v: string) => void (data[k] = v) });
-    return data;
-  };
+describe("schedulePatch theo luật duyệt của backend", () => {
+  const at = "2026-10-12T09:00:00.000Z";
+  const it2 = (status: ContentResponse["status"], scheduledAt: string | null = null) => ({ status, scheduledAt });
 
-  it("lưu và đọc lại lịch cục bộ theo dự án, phủ lên dữ liệu thật", async () => {
-    store();
-    await updateSchedule("p", "a", { status: "SCHEDULED", scheduledAt: "2026-10-12T09:00:00.000Z" });
-    expect(loadOverlay("p")).toEqual({ a: { status: "SCHEDULED", scheduledAt: "2026-10-12T09:00:00.000Z" } });
-    expect(loadOverlay("other")).toEqual({});
-    const merged = applyOverlay([item("a"), item("b")], loadOverlay("p"));
-    expect(merged[0]).toMatchObject({ status: "SCHEDULED", scheduledAt: "2026-10-12T09:00:00.000Z" });
-    expect(merged[1].status).toBe("DRAFT");
+  it("bài chưa duyệt không lên lịch được", () => {
+    expect(schedulePatch(it2("DRAFT"), "SCHEDULED", at)).toBeTypeOf("string");
+    expect(schedulePatch(it2("DRAFT"), "DRAFT", at)).toBeTypeOf("string");
   });
 
-  it("dữ liệu hỏng hoặc localStorage ném lỗi thì coi như rỗng", () => {
-    const data = store();
-    data["marketos.calendar.v1.p"] = "{hong";
-    expect(loadOverlay("p")).toEqual({});
-    vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } });
-    expect(loadOverlay("p")).toEqual({});
+  it("duyệt, lên lịch, dời lịch, hoàn tất", () => {
+    expect(schedulePatch(it2("DRAFT"), "READY", null)).toEqual({ status: "READY" });
+    expect(schedulePatch(it2("READY"), "SCHEDULED", at)).toEqual({ status: "SCHEDULED", scheduledAt: at });
+    expect(schedulePatch(it2("READY"), "SCHEDULED", null)).toBeTypeOf("string");
+    expect(schedulePatch(it2("SCHEDULED", at), "SCHEDULED", "2026-10-13T09:00:00.000Z")).toEqual({ status: "SCHEDULED", scheduledAt: "2026-10-13T09:00:00.000Z" });
+    expect(schedulePatch(it2("SCHEDULED", at), "DONE", at)).toEqual({ status: "DONE", scheduledAt: at });
+    expect(schedulePatch(it2("SCHEDULED", at), "SCHEDULED", at)).toBeNull();
   });
 
-  it("bỏ qua mục sai định dạng", () => {
-    const data = store();
-    data["marketos.calendar.v1.p"] = JSON.stringify({ ok: { status: "DONE", scheduledAt: null }, bad: { status: 1 } });
-    expect(Object.keys(loadOverlay("p"))).toEqual(["ok"]);
+  it("bỏ lịch: bài đã duyệt về READY, bản nháp giữ lịch cũ thì chỉ xoá lịch", () => {
+    expect(schedulePatch(it2("SCHEDULED", at), "READY", null)).toEqual({ status: "READY" });
+    expect(schedulePatch(it2("DRAFT", at), "DRAFT", null)).toEqual({ scheduledAt: null });
+    expect(schedulePatch(it2("DRAFT"), "DRAFT", null)).toBeNull();
+  });
+
+  it("NEXT_STATUSES không cho SCHEDULED về thẳng DRAFT", () => {
+    expect(NEXT_STATUSES.SCHEDULED).not.toContain("DRAFT");
+    expect(NEXT_STATUSES.DRAFT).not.toContain("SCHEDULED");
+  });
+
+  it("findPlaceholders tìm [..] và {{..}}, không trùng", () => {
+    expect(findPlaceholders({ title: "Hi", body: "Ở [Địa chỉ doanh nghiệp]\n{{unsubscribe_link}} [Địa chỉ doanh nghiệp]", cta: null })).toEqual(["[Địa chỉ doanh nghiệp]", "{{unsubscribe_link}}"]);
+    expect(findPlaceholders({ title: "Hi", body: "Không có gì", cta: null })).toEqual([]);
+  });
+});
+
+describe("mergeById", () => {
+  it("gộp hai danh sách, mục trùng giữ bản updatedAt mới hơn", () => {
+    const old = { ...item("a"), updatedAt: "2026-10-01T00:00:00.000Z" };
+    const fresh = { ...item("a", "2026-10-12T09:00:00.000Z"), updatedAt: "2026-10-02T00:00:00.000Z" };
+    expect(mergeById([fresh], [old, item("b")])).toEqual([fresh, item("b")]);
+    expect(mergeById([old], [fresh])).toEqual([fresh]);
+    expect(mergeById(undefined, [item("b")])).toEqual([item("b")]);
   });
 });

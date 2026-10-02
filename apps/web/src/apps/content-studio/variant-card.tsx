@@ -3,7 +3,7 @@
 import type { GeneratedVariant } from "@marketos/shared";
 import { Check, Copy, Save } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify/notify";
 import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,9 @@ import type { VariantState } from "./use-generation";
 export async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success("Copied to clipboard");
+    notify.success("Copied to clipboard", { duration: 2500 });
   } catch {
-    toast.error("Couldn't copy. Select the text and copy it manually.");
+    notify.error("Couldn't copy", { description: "Select the text and copy it manually." });
   }
 }
 

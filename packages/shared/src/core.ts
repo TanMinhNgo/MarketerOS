@@ -41,11 +41,31 @@ export const ProjectListResponseSchema = z.object({
   limit: z.number().int(),
   total: z.number().int(),
 });
+export const ContentLanguageSchema = z.enum([
+  'vi',
+  'en',
+  'zh',
+  'ja',
+  'ko',
+  'th',
+  'id',
+  'fr',
+  'es',
+  'de',
+]);
 export const UpsertBrandBriefSchema = z
   .object({
     product: text(5000),
     audience: text(3000),
     tone: text(500),
+    language: ContentLanguageSchema.default('vi'),
+    businessAddress: z
+      .string()
+      .trim()
+      .max(300)
+      .nullable()
+      .default(null)
+      .transform((value) => value || null),
     keyMessages: z.array(text(500)).max(20).default([]),
     avoidWords: z.array(text(100)).max(100).default([]),
     samplePosts: z.array(text(5000)).max(10).default([]),
@@ -59,6 +79,8 @@ export const UpsertBrandBriefSchema = z
 export const BrandBriefResponseSchema = UpsertBrandBriefSchema.extend({
   id: z.string(),
   projectId: z.string(),
+  language: ContentLanguageSchema,
+  businessAddress: z.string().max(300).nullable(),
   visualStyle: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -72,11 +94,16 @@ export const MeResponseSchema = z.object({
   plan: PlanKeySchema,
   createdAt: z.iso.datetime(),
 });
-export const WebhookAcknowledgementSchema = z.object({ received: z.literal(true) });
-export type WebhookAcknowledgement = z.infer<typeof WebhookAcknowledgementSchema>;
+export const WebhookAcknowledgementSchema = z.object({
+  received: z.literal(true),
+});
+export type WebhookAcknowledgement = z.infer<
+  typeof WebhookAcknowledgementSchema
+>;
 export type CreateProjectInput = z.infer<typeof CreateProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof UpdateProjectSchema>;
 export type ProjectListQuery = z.infer<typeof ProjectListQuerySchema>;
+export type ContentLanguage = z.infer<typeof ContentLanguageSchema>;
 export type UpsertBrandBriefInput = z.infer<typeof UpsertBrandBriefSchema>;
 export type ProjectResponse = z.infer<typeof ProjectResponseSchema>;
 export type ProjectListResponse = z.infer<typeof ProjectListResponseSchema>;

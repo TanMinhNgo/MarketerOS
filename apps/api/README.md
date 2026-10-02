@@ -75,6 +75,10 @@ List giới hạn 1–100, mặc định 20, page từ 1; thứ tự createdAt d
 PUT brief thay toàn bộ trường: product, audience, tone bắt buộc; keyMessages/avoidWords/
 samplePosts/brandColors mặc định [], visualStyle mặc định null. Response thêm id, projectId,
 createdAt, updatedAt. Dùng giới hạn độ dài/mảng đúng packages/shared/src/core.ts.
+`language` thuộc `ContentLanguageSchema` (`vi`, `en`, `zh`, `ja`, `ko`, `th`, `id`, `fr`,
+`es`, `de`), mặc định `vi`; `businessAddress` tối đa 300 ký tự, trim và chuyển chuỗi
+rỗng thành null. Response luôn có hai trường này. Client cũ PUT không gửi chúng sẽ
+đặt lại `vi`/null; frontend nên gửi đủ giá trị hiện tại khi lưu brief.
 Payload field lạ bị từ chối; API validate trực tiếp bằng shared Zod qua SchemaPipe,
 Swagger chuyển cùng schema sang OpenAPI 3.0, không duy trì bản DTO validation trùng lặp.
 
@@ -140,14 +144,14 @@ Kiểm tra quy tắc ngữ nghĩa (ví dụ có bịa số liệu hay không) v�
 | TikTok | [TikTok: Direct Post](https://developers.tiktok.com/docs/en/content-posting-api-reference-direct-post), [TikTok: content disclosure](https://support.tiktok.com/en/business-and-creator/creator-and-business-accounts/promoting-a-brand-product-or-service) | API cho caption tối đa 2.200 UTF-16 runes; dự án cố ý giới hạn body dưới 150 ký tự. Đăng nội dung thương mại còn cần bật disclosure/toggle khi đăng. |
 | LinkedIn | [LinkedIn: post limit](https://www.linkedin.com/help/linkedin/answer/a522483/differences-between-posting-updates-and-publishing), [Professional Community Policies](https://www.linkedin.com/legal/professional-community-policies) | Bài đăng tối đa 3.000 ký tự; 100–200 từ và 0–3 hashtag là mục tiêu dự án. |
 | YouTube | [YouTube Studio limits](https://support.google.com/youtube/answer/57407), [YouTube Data API limits](https://developers.google.com/youtube/v3/docs/videos), [paid promotion](https://support.google.com/youtube/answer/154235) | Title dưới 70 thay vì tối đa 100 ký tự. Giao diện ghi mô tả 5.000 ký tự, API giới hạn 5.000 byte UTF-8; validator áp cả hai để nháp dùng được qua API. Cần bật khai báo paid promotion khi đăng. |
-| Email | [FTC: CAN-SPAM guide](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) | Subject dưới 50, preview dưới 90, không hashtag là quy tắc dự án. `{{unsubscribe_link}}` và `[Địa chỉ doanh nghiệp]` là placeholder nháp; địa chỉ thực, danh tính sender và hủy đăng ký hoạt động phải được xác minh trước khi gửi. Quy định pháp lý tùy thị trường gửi. |
+| Email | [FTC: CAN-SPAM guide](https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business) | Subject dưới 50, preview dưới 90, không hashtag là quy tắc dự án. Email dùng `businessAddress` khi có; nếu thiếu dùng `[Địa chỉ doanh nghiệp]`. `[Tên doanh nghiệp]` vẫn là placeholder vì brief chưa có tên pháp nhân riêng. `{{unsubscribe_link}}` cũng phải được thay bằng liên kết hoạt động trước khi gửi. Quy định pháp lý tùy thị trường gửi. |
 | Blog | [Google Search: people-first content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content) | 500–800 từ, title dưới 65 và 2–4 từ khóa là quy tắc biên tập của dự án; Google không yêu cầu độ dài bài cố định. |
 
 Chưa xác minh chính thức được các mốc hook Facebook 20 từ, Instagram 125 ký tự,
 các mức hashtag tối ưu, danh sách hashtag bị hạn chế và tất cả quy tắc độ dài theo từ;
 chúng là hướng dẫn biên tập, không được trình bày như giới hạn của nền tảng. Brand Brief
-hiện chưa có trường địa chỉ/tên doanh nghiệp tách riêng nên email chỉ có placeholder;
-cần bổ sung contract/schema trước khi tự động gửi email thương mại.
+hiện chưa có trường tên doanh nghiệp tách riêng nên email vẫn dùng placeholder tên;
+cần dữ liệu người gửi thật và cơ chế hủy đăng ký trước khi tự động gửi email thương mại.
 
 ## Migration và kiểm tra
 

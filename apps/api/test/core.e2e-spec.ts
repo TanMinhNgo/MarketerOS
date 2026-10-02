@@ -170,11 +170,28 @@ suite('Core API with PostgreSQL and real guard/repositories', () => {
       .set(auth(a))
       .send(brief)
       .expect(200);
+    expect(BrandBriefResponseSchema.parse(first.body).language).toBe('vi');
+    expect(
+      BrandBriefResponseSchema.parse(first.body).businessAddress,
+    ).toBeNull();
+    const localized = await request(app.getHttpServer())
+      .put(`/api/projects/${id}/brand-brief`)
+      .set(auth(a))
+      .send({ ...brief, language: 'en', businessAddress: '  123 Main St  ' })
+      .expect(200);
+    expect(BrandBriefResponseSchema.parse(localized.body).language).toBe('en');
+    expect(BrandBriefResponseSchema.parse(localized.body).businessAddress).toBe(
+      '123 Main St',
+    );
     const second = await request(app.getHttpServer())
       .put(`/api/projects/${id}/brand-brief`)
       .set(auth(a))
       .send({ ...brief, tone: 'Chuyên nghiệp' })
       .expect(200);
+    expect(BrandBriefResponseSchema.parse(second.body).language).toBe('vi');
+    expect(
+      BrandBriefResponseSchema.parse(second.body).businessAddress,
+    ).toBeNull();
     expect(BrandBriefResponseSchema.parse(second.body).id).toBe(
       BrandBriefResponseSchema.parse(first.body).id,
     );

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ContentLanguageSchema,
   GeneratedVariantsSchema,
   VariantDeltaSchema,
   type GenerateContentInput,
@@ -34,6 +35,8 @@ export class AiService {
       product: brief.product,
       audience: brief.audience,
       tone: brief.tone,
+      language: ContentLanguageSchema.parse(brief.language),
+      businessAddress: brief.businessAddress,
       keyMessages: brief.keyMessages,
       avoidWords: brief.avoidWords,
       samplePosts: brief.samplePosts,
@@ -53,6 +56,7 @@ export class AiService {
     return {
       generationId: generation.id,
       channel: input.channel,
+      businessAddress: brief.businessAddress,
       avoidWords: brief.avoidWords,
       ...this.prompts.build(input, briefSnapshot),
     };
@@ -107,6 +111,7 @@ export class AiService {
               parsed.data.variants,
               prepared.channel,
               prepared.avoidWords,
+              prepared.businessAddress,
             )
           : ['Đầu ra không đúng cấu trúc 3 biến thể.'];
         if (['length', 'content-filter', 'error'].includes(finishReason))

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useEffect, useState, type CSSProperties } from "react";
+import { useNotifications } from "@/lib/notify/notification-store";
 import { BeachScene } from "./BeachScene";
 import { DesktopIcons } from "./DesktopIcons";
 import { MenuBar } from "./MenuBar";
 import { MobileHome } from "./MobileHome";
 import { MobileSheet } from "./MobileSheet";
+import { useScheduleReminders } from "./notifications/use-schedule-reminders";
 import { SearchPalette } from "./search/SearchPalette";
 import { Taskbar } from "./Taskbar";
 import { useLayoutPersist, useUrlSync } from "./use-desktop-sync";
@@ -20,6 +23,10 @@ export function Desktop() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const open = useWindowStore((s) => s.open);
   useUrlSync();
+  useScheduleReminders();
+  // Thông báo trong chuông thuộc về từng tài khoản Clerk.
+  const { user } = useUser();
+  useEffect(() => useNotifications.getState().setUser(user?.id ?? null), [user?.id]);
   useLayoutPersist();
 
   // Mobile chỉ hiện một app một lúc: mở app mới thì đóng các app khác.
