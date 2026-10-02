@@ -208,7 +208,7 @@ export const SECTIONS: DocSection[] = [
           <Step title="Pick a channel">Facebook, Instagram, TikTok, LinkedIn, YouTube, Email or Blog. Each has its own length and format rules.</Step>
           <Step title="Describe the post">Fill in the goal and topic, and add notes if you like.</Step>
           <Step title="Generate">Three variants appear as the AI writes them. Press Stop to cancel.</Step>
-          <Step title="Keep the best">Edit a variant in place, copy it, or press <strong>Save as draft</strong>. Not happy with one? Press <strong>Regenerate</strong> on that card to get a new version while the others stay. Each regenerate uses 1 generation.</Step>
+          <Step title="Keep the best">Edit a variant in place, copy it, or press <strong>Save as draft</strong>. Not happy with one? Press <strong>Regenerate</strong> on that card to get a new version while the others stay. Regenerates are cheaper: every 3 count as 1 generation (the 1st of each 3 is counted, the next 2 are free), across all your projects each month.</Step>
         </Steps>
         <H>Review and approve</H>
         <P>Every saved draft starts as <strong>Needs review</strong>. Read it, press <strong>Approve</strong> and tick the checklist. Only approved content can go on the calendar.</P>

@@ -67,7 +67,7 @@ function Editable({ index, initial, saving, onSave, onRegenerate }: CardProps & 
             type="button"
             variant={confirmRegen ? "destructive" : "ghost"}
             size="sm"
-            title="Write a new version of this variant (uses 1 generation)"
+            title="Write a new version of this variant (every 3 regenerates use 1 generation)"
             onBlur={() => setConfirmRegen(false)}
             onClick={() => (edited && !confirmRegen ? setConfirmRegen(true) : onRegenerate())}
           >

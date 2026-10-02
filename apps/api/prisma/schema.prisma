@@ -203,6 +203,7 @@ model Generation {
   kind                    GenerationKind   @default(TEXT)
   requestedOutputs        Int              @default(1)
   completedOutputs        Int              @default(0)
+  /// TEXT + requestedOutputs=1 identifies regeneration: store 0; charge ceil(count/3) per quota period.
   quotaUnits              Int              @default(1)
   status                  GenerationStatus @default(PENDING)
   tokensIn                Int?

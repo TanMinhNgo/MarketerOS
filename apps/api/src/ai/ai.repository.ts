@@ -7,6 +7,7 @@ import {
 import type { GenerateContentInput } from '@marketos/shared';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { textUsage } from './quota.service';
 
 @Injectable()
 export class AiRepository {
@@ -60,18 +61,34 @@ export class AiRepository {
           errorCode: 'INTERRUPTED',
         },
       });
+      const where = {
+        userId,
+        kind: 'TEXT' as const,
+        createdAt: { gte: start, lt: end },
+      };
       const usage = await tx.generation.aggregate({
-        where: { userId, kind: 'TEXT', createdAt: { gte: start, lt: end } },
+        where,
         _sum: { quotaUnits: true },
       });
-      if ((usage._sum.quotaUnits ?? 0) + 1 > limit)
+      // ponytail: TEXT/1 denotes regeneration; add a discriminator before other single-output TEXT flows.
+      const regenerations = await tx.generation.count({
+        where: { ...where, requestedOutputs: 1 },
+      });
+      const quotaUnits = requestedOutputs === 1 ? 0 : 1;
+      const units = usage._sum.quotaUnits ?? 0;
+      const used = textUsage(units, regenerations);
+      const nextUsed = textUsage(
+        units + quotaUnits,
+        regenerations + (requestedOutputs === 1 ? 1 : 0),
+      );
+      if (nextUsed > limit)
         throw new HttpException(
           {
             code: 'QUOTA_EXCEEDED',
             message: 'Bạn đã dùng hết lượt tạo nội dung trong kỳ này.',
             details: {
               limit,
-              used: usage._sum.quotaUnits ?? 0,
+              used,
               resetAt: end.toISOString(),
             },
           },
@@ -87,7 +104,7 @@ export class AiRepository {
           model,
           kind: 'TEXT',
           requestedOutputs,
-          quotaUnits: 1,
+          quotaUnits,
           status: 'PENDING',
         },
         select: { id: true },

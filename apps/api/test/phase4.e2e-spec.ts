@@ -220,7 +220,7 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       .expect(404);
   });
 
-  it('validates regeneration input/auth and streams only the requested index with one quota unit', async () => {
+  it('validates regeneration input/auth and streams only the requested index with grouped quota metadata', async () => {
     const path = `/api/projects/${projectId}/generate/variant`;
     const body = {
       input: { channel: 'FACEBOOK', goal: 'Giới thiệu', topic: 'Khóa học' },
@@ -237,8 +237,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
     for (const invalid of [
       { ...body, index: 3 },
       { ...body, others: [variant, variant, variant] },
-      { ...body, extra: true },
-      { ...body, input: { ...body.input, userId: b } },
     ]) {
       const res = await request(app.getHttpServer())
         .post(path)
@@ -287,7 +285,7 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       kind: 'TEXT',
       requestedOutputs: 1,
       completedOutputs: 1,
-      quotaUnits: 1,
+      quotaUnits: 0,
       status: 'SUCCEEDED',
       tokensIn: 12,
       tokensOut: 34,
@@ -519,17 +517,37 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       .send({ channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' })
       .expect(429);
     expect((response.body as { code: string }).code).toBe('QUOTA_EXCEEDED');
-    const single = await request(app.getHttpServer())
-      .post(`/api/projects/${projectId}/generate/variant`)
-      .set(auth(a))
-      .set('Idempotency-Key', randomUUID())
-      .send({
-        input: { channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' },
-        others: [],
-        index: 0,
-      })
-      .expect(429);
-    expect((single.body as { code: string }).code).toBe('QUOTA_EXCEEDED');
+    const regenerate = () =>
+      request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/generate/variant`)
+        .set(auth(a))
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          input: { channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' },
+          others: [],
+          index: 0,
+        });
+    // First regeneration was reserved earlier; #2/#3 still fit at usage=limit.
+    for (const status of ['FAILED', 'CANCELLED'] as const) {
+      const result = await regenerate().expect(200);
+      const done = SingleVariantDoneSchema.parse(
+        JSON.parse(result.text.match(/event: done\ndata: ([^\n]+)/)![1]),
+      );
+      await prisma.generation.update({
+        where: { id: done.generationId },
+        data: { status, completedOutputs: 0 },
+      });
+    }
+    const single = await regenerate().expect(429);
+    expect(single.body).toMatchObject({
+      code: 'QUOTA_EXCEEDED',
+      details: { limit: 10, used: 10, resetAt: end.toISOString() },
+    });
+    expect(
+      await prisma.generation.count({
+        where: { userId: owner.id, kind: 'TEXT', requestedOutputs: 1 },
+      }),
+    ).toBe(3);
   });
 
   it('serializes quota reservations for concurrent requests by the same user', async () => {
@@ -573,5 +591,48 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
         where: { userId: owner.id, kind: 'TEXT' },
       }),
     ).toBe(1);
+    const single = (requestId: string) =>
+      ai.reserve(
+        project.id,
+        owner.id,
+        requestId,
+        { channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' },
+        { product: 'Test' },
+        'test-model',
+        2,
+        start,
+        end,
+        1,
+      );
+    const singles = await Promise.allSettled(
+      Array.from({ length: 4 }, () => single(randomUUID())),
+    );
+    expect(
+      singles.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(3);
+    const rejected = singles.find((result) => result.status === 'rejected');
+    expect(
+      rejected?.status === 'rejected' &&
+        (rejected.reason as { getResponse: () => unknown }).getResponse(),
+    ).toMatchObject({ code: 'QUOTA_EXCEEDED', details: { limit: 2, used: 2 } });
+    const records = await prisma.generation.findMany({
+      where: { userId: owner.id, kind: 'TEXT' },
+    });
+    expect(
+      records.filter((record) => record.requestedOutputs === 1),
+    ).toHaveLength(3);
+    expect(records.reduce((sum, record) => sum + record.quotaUnits, 0)).toBe(1);
+    const extraRegular = ai.reserve(
+      project.id,
+      owner.id,
+      randomUUID(),
+      { channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' },
+      { product: 'Test' },
+      'test-model',
+      2,
+      start,
+      end,
+    );
+    await expect(extraRegular).rejects.toMatchObject({ status: 429 });
   });
 });

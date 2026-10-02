@@ -140,8 +140,20 @@ bằng schema riêng, thay đúng một thẻ và giữ các thẻ khác; dùng 
 mới khi lưu nháp của thẻ vừa tạo lại.
 
 Generation có kind TEXT, requestedOutputs/completedOutputs thành công bằng 1,
-quotaUnits = 1. Tính **1 lượt TEXT** cho một lần tạo lại là giả định chờ người dùng
-chốt (có thể muốn rẻ hơn); retry sửa đầu ra dùng cùng Generation, không tính thêm.
+quotaUnits = 0. Theo quyết định 02/10/2026, **3 lần tạo lại trong cùng chu kỳ tính
+1 lượt TEXT, làm tròn lên**: lần 1 tính 1, lần 2/3 không tăng usage, lần 4 tính thêm 1.
+Usage TEXT theo user (mọi project) trong tháng UTC là `SUM(quotaUnits) +
+CEIL(COUNT(Generation TEXT có requestedOutputs = 1) / 3)`. Tạo cả 3 vẫn ghi
+quotaUnits = 1. Tính mọi status, kể cả PENDING/FAILED/CANCELLED; retry sửa đầu ra
+dùng cùng Generation, không tính thêm. Khi usage bằng limit, lần 2/3 vẫn được
+chấp nhận; chỉ trả 429 nếu usage sau reservation vượt limit. details.used là
+usage hiện tại theo công thức mới. Đếm và reservation cùng transaction dưới khóa
+User để các request đồng thời không vượt quota.
+
+Migration `20261002030000_regeneration_quota` chuyển mọi Generation TEXT
+requestedOutputs = 1 cũ sang quotaUnits = 0 và cập nhật CHECK constraint;
+không thêm cột. Dừng API cũ, chạy migration rồi chạy API mới để tránh ghi quota
+theo quy tắc cũ. Chưa có API trả usage riêng; request/response/SSE không đổi.
 Idempotency key dùng chung namespace với `/generate`: key đã dùng ở một trong hai
 endpoint trả 409 CONFLICT. Body/key sai trả 400 VALIDATION, thiếu/sai auth 401,
 ownership/Trash/brief thiếu 404, quota/rate limit 429, cấu hình/provider/DB lỗi 503;

@@ -81,7 +81,7 @@ export class AiController {
   @ApiBody({ schema: apiSchema(GenerateVariantInputSchema, 'input') })
   @ApiOkResponse({
     description:
-      'SSE: variant.delta/variant.done với index đã gửi; done { generationId, variants: [variant] } (SingleVariantDoneSchema), hoặc error (ApiError). Một request tính 1 TEXT.',
+      'SSE: variant.delta/variant.done với index đã gửi; done { generationId, variants: [variant] } (SingleVariantDoneSchema), hoặc error (ApiError). Mỗi 3 lần tạo lại trong kỳ tính 1 TEXT, làm tròn lên; lần 2/3 vẫn được phép khi usage bằng limit. FAILED/CANCELLED vẫn tính.',
     content: { 'text/event-stream': { schema: { type: 'string' } } },
   })
   generateVariant(
