@@ -1,0 +1,157 @@
+"use client";
+
+import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, pointerWithin, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import type { ContentResponse } from "@marketos/shared";
+import { CalendarDays, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { errorMessage } from "@/lib/api-client";
+import { SERVER_SCHEDULING, type SchedulePatch } from "@/lib/calendar-api";
+import { addDays, addMonths, groupByDay, monthGrid, moveToDay, toKey, weekDays } from "@/lib/calendar-utils";
+import { cn } from "@/lib/utils";
+import { CHANNELS } from "../content-studio/channels";
+import { channelColor } from "./channel-colors";
+import { ChipPreview, ItemChip } from "./item-chip";
+import { ItemDialog } from "./item-dialog";
+import { useCalendarItems, useReschedule } from "./use-calendar";
+
+type View = "month" | "week";
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const monthLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
+const rangeLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+
+function DayCell({ day, inMonth, today, items, view, onOpen }: { day: Date; inMonth: boolean; today: boolean; items: ContentResponse[]; view: View; onOpen: (i: ContentResponse) => void }) {
+  const key = toKey(day);
+  const { setNodeRef, isOver } = useDroppable({ id: `day:${key}` });
+  const shown = view === "month" ? items.slice(0, 3) : items;
+  return (
+    <div
+      ref={setNodeRef}
+      role="gridcell"
+      aria-label={`${day.toDateString()}, ${items.length} item${items.length === 1 ? "" : "s"}`}
+      className={cn("flex min-h-0 flex-col gap-1 border-b border-r p-1.5 transition-colors", !inMonth && "bg-muted/30 text-muted-foreground", isOver && "bg-primary/15 ring-2 ring-inset ring-primary")}
+    >
+      <span className={cn("grid size-6 place-items-center self-end rounded-full text-xs font-semibold", today && "bg-primary text-primary-foreground")}>{day.getDate()}</span>
+      <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
+        {shown.map((i) => <ItemChip key={i.id} item={i} onOpen={onOpen} compact={view === "month"} />)}
+        {view === "month" && items.length > shown.length && <span className="px-1 text-[10px] font-semibold text-muted-foreground">+{items.length - shown.length} more</span>}
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ items, onOpen }: { items: ContentResponse[]; onOpen: (i: ContentResponse) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "unscheduled" });
+  return (
+    <aside ref={setNodeRef} aria-label="Unscheduled drafts" className={cn("flex min-h-0 flex-col rounded-2xl border-2 p-3 transition-colors", isOver ? "border-primary bg-primary/10" : "border-[#3B2A4A]/30")}>
+      <h3 className="font-display text-sm font-bold">Unscheduled</h3>
+      <p className="mb-2 text-xs text-muted-foreground">Drag a draft onto a day. Drop here to unschedule.</p>
+      <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
+        {items.length === 0 && <p className="text-xs text-muted-foreground">No unscheduled drafts. Create some in Content Studio.</p>}
+        {items.map((i) => <ItemChip key={i.id} item={i} onOpen={onOpen} />)}
+      </div>
+    </aside>
+  );
+}
+
+export function Calendar({ projectId }: { projectId: string }) {
+  const { data, isPending, error, refetch } = useCalendarItems(projectId);
+  const reschedule = useReschedule(projectId);
+  const [view, setView] = useState<View>("month");
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [dragging, setDragging] = useState<ContentResponse | null>(null);
+  const [selected, setSelected] = useState<ContentResponse | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const items = useMemo(() => data ?? [], [data]);
+  const byDay = useMemo(() => groupByDay(items), [items]);
+  const unscheduled = useMemo(() => items.filter((i) => !i.scheduledAt), [items]);
+  const days = view === "month" ? monthGrid(anchor.getFullYear(), anchor.getMonth()) : weekDays(anchor);
+  const todayKey = toKey(new Date());
+
+  const move = (id: string, patch: SchedulePatch) => reschedule.mutate({ id, patch });
+
+  const onDragEnd = (e: DragEndEvent) => {
+    setDragging(null);
+    const item = items.find((i) => i.id === e.active.id);
+    const over = e.over?.id;
+    if (!item || typeof over !== "string") return;
+    if (over === "unscheduled") {
+      if (item.scheduledAt) move(item.id, { status: "DRAFT", scheduledAt: null });
+    } else if (over.startsWith("day:")) {
+      const scheduledAt = moveToDay(item.scheduledAt, over.slice(4));
+      if (scheduledAt !== item.scheduledAt) move(item.id, { status: item.status === "DONE" ? "DONE" : "SCHEDULED", scheduledAt });
+    }
+  };
+
+  const step = (dir: -1 | 1) => setAnchor((a) => (view === "month" ? addMonths(a, dir) : addDays(a, 7 * dir)));
+  const title = view === "month" ? monthLabel.format(anchor) : `${rangeLabel.format(days[0])} – ${rangeLabel.format(days[6])}, ${days[6].getFullYear()}`;
+
+  if (isPending) return <p role="status" className="p-6 text-sm text-muted-foreground">Loading calendar…</p>;
+  if (error)
+    return (
+      <div className="grid h-full place-items-center p-6 text-center text-sm">
+        <div>
+          <p>{errorMessage(error)}</p>
+          <Button className="mt-3" variant="outline" onClick={() => refetch()}>Try again</Button>
+        </div>
+      </div>
+    );
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={(e: DragStartEvent) => setDragging(items.find((i) => i.id === e.active.id) ?? null)} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+      <div className="@container flex h-full min-h-0 flex-col">
+        <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
+          <CalendarDays className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-display text-base font-bold">{title}</h2>
+          <div className="flex-1" />
+          <div role="group" aria-label="Change period" className="flex items-center gap-1">
+            <Button variant="outline" size="icon-sm" aria-label="Previous" onClick={() => step(-1)}><ChevronLeft /></Button>
+            <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}>Today</Button>
+            <Button variant="outline" size="icon-sm" aria-label="Next" onClick={() => step(1)}><ChevronRight /></Button>
+          </div>
+          <div role="group" aria-label="View" className="flex overflow-hidden rounded-md border">
+            {(["month", "week"] as const).map((v) => (
+              <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={cn("px-3 py-1 text-xs font-semibold capitalize", view === v ? "bg-primary text-primary-foreground" : "hover:bg-accent")}>
+                {v}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        {!SERVER_SCHEDULING && (
+          <p className="flex items-start gap-2 border-b bg-amber-500/10 px-4 py-1.5 text-xs">
+            <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            Schedules are saved on this device for now. They will sync to your account once the server supports scheduling.
+          </p>
+        )}
+
+        <div className="grid min-h-0 flex-1 gap-3 p-3 @3xl:grid-cols-[200px_minmax(0,1fr)]">
+          <Sidebar items={unscheduled} onOpen={setSelected} />
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border">
+            <div role="row" className="grid grid-cols-7 border-b bg-muted/40 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {WEEKDAYS.map((d) => <div key={d} role="columnheader" className="py-1.5">{d}</div>)}
+            </div>
+            <div role="grid" aria-label={title} className={cn("grid min-h-0 flex-1 grid-cols-7 overflow-y-auto", view === "month" ? "auto-rows-fr" : "auto-rows-[minmax(280px,1fr)]")}>
+              {days.map((d) => (
+                <DayCell key={toKey(d)} day={d} inMonth={view === "week" || d.getMonth() === anchor.getMonth()} today={toKey(d) === todayKey} items={byDay.get(toKey(d)) ?? []} view={view} onOpen={setSelected} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <footer aria-label="Legend" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-4 py-2 text-xs">
+          {CHANNELS.map((c) => (
+            <span key={c.value} className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full" style={{ background: channelColor(c.value) }} aria-hidden="true" />
+              {c.label}
+            </span>
+          ))}
+        </footer>
+      </div>
+
+      <DragOverlay>{dragging && <ChipPreview item={dragging} />}</DragOverlay>
+      {selected && <ItemDialog key={selected.id} item={selected} onClose={() => setSelected(null)} onSave={(patch) => move(selected.id, patch)} />}
+    </DndContext>
+  );
+}

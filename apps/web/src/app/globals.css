@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --foreground: #1f1b3a;
+  --card: oklch(1 0 0);
+  --card-foreground: #1f1b3a;
+  --popover: oklch(1 0 0);
+  --popover-foreground: #1f1b3a;
+  --primary: #5b4beb;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.97 0.005 285);
+  --secondary-foreground: #1f1b3a;
+  --muted: oklch(0.97 0.005 285);
+  --muted-foreground: #5b5878;
+  --accent: oklch(0.95 0.03 285);
+  --accent-foreground: #1f1b3a;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: rgb(31 27 58 / 0.1);
+  --input: rgb(31 27 58 / 0.14);
+  --ring: #5b4beb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-body), system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-body), sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}
+
+/* ---- Cảnh bãi biển: chuyển động (dùng trong BeachScene) ---- */
+@keyframes drift { from { transform: translateX(-360px); } to { transform: translateX(1440px); } }
+@keyframes wave-l { from { transform: translateX(0); } to { transform: translateX(-1440px); } }
+@keyframes wave-r { from { transform: translateX(-1440px); } to { transform: translateX(0); } }
+@keyframes walk-r { from { transform: translateX(-80px); } to { transform: translateX(1440px); } }
+@keyframes walk-l { from { transform: translateX(1440px); } to { transform: translateX(-80px); } }
+@keyframes bob-y { from { transform: translateY(-16px); } to { transform: translateY(16px); } }
+@keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(0.45); } }
+@keyframes step-a { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+@keyframes step-b { from { transform: rotate(28deg); } to { transform: rotate(-28deg); } }
+@keyframes sway { from { transform: rotate(-2.6deg); } to { transform: rotate(2.6deg); } }
+@keyframes twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes surf { 0%, 100% { transform: translate(0, 0) rotate(-3deg); } 50% { transform: translate(34px, -6px) rotate(3deg); } }
+@keyframes glit { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes shimmer { 0%, 100% { opacity: 0.25; transform: scaleX(0.7); } 50% { opacity: 1; transform: scaleX(1.15); } }
+@keyframes ripple { 0% { opacity: 0.9; transform: scale(0.55); } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes swim-arm { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+@keyframes swim-arm-r { from { transform: rotate(22deg); } to { transform: rotate(-22deg); } }
+@keyframes wave-arm { from { transform: rotate(-16deg); } to { transform: rotate(18deg); } }
+@keyframes flag { from { transform: skewY(-9deg) scaleX(1); } to { transform: skewY(9deg) scaleX(0.82); } }
+@keyframes flicker { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(0.88, 1.18); } }
+@keyframes wind-wave { 0%, 100% { transform: translateY(0) rotate(0deg); } 25% { transform: translateY(-18px) rotate(-6deg); } 75% { transform: translateY(18px) rotate(6deg); } }
+@keyframes wind-flow { to { stroke-dashoffset: -400; } }
+@keyframes glow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+@keyframes beam { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+@keyframes frond { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+@keyframes bob-s { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
+@keyframes swim-drift { from { transform: translateX(-40px); } to { transform: translateX(40px); } }
+@keyframes icon-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-5px) rotate(-1deg); } }
+
+.drift { animation: drift 150s linear infinite; }
+.wave-l { animation: wave-l 30s linear infinite; }
+.wave-r { animation: wave-r 30s linear infinite; }
+.walk-r { animation: walk-r 80s linear infinite; }
+.walk-l { animation: walk-l 80s linear infinite; }
+.bob-y { animation: bob-y 4s ease-in-out infinite alternate; }
+.flap { animation: flap 0.55s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 60%; }
+.step-a { animation: step-a 0.8s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+.step-b { animation: step-b 0.8s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0%; }
+.sway { animation: sway 4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+.twinkle { animation: twinkle 3s ease-in-out infinite; }
+.spin-slow { animation: spin-slow 90s linear infinite; transform-box: fill-box; transform-origin: center; }
+.surf { animation: surf 7s ease-in-out infinite; }
+.glit { animation: glit 3s ease-in-out infinite; }
+.shimmer { animation: shimmer 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.ripple { animation: ripple 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.swim-arm { animation: swim-arm 0.9s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 100% 100%; }
+.swim-arm-r { animation: swim-arm-r 0.9s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 100%; }
+.wave-arm { animation: wave-arm 0.7s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 100%; }
+.flag { animation: flag 0.8s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }
+.flicker { animation: flicker 0.5s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.wind-wave { animation: wind-wave 5s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.wind-flow { animation: wind-flow 4s linear infinite; }
+.glow { animation: glow 0.9s ease-in-out infinite alternate; }
+.beam { animation: beam 7s linear infinite; transform-box: fill-box; transform-origin: 0% 50%; }
+.frond { animation: frond 2.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }
+.bob-s { animation: bob-s 2.6s ease-in-out infinite alternate; }
+.swim-drift { animation: swim-drift 9s ease-in-out infinite alternate; }
+.icon-bob { animation: icon-bob 4.5s ease-in-out infinite; }
+
+/* ---- Con trỏ chuột theo phong cách MarketOS: mũi tên tím viền đậm; chân mèo chỉ hiện trên thanh tiêu đề cửa sổ ---- */
+:root {
+  --cur-arrow: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 32 32'><path d='M5 3v21l5.5-5 4 9 4.5-2-4-8.5h7.5z' fill='%236D5BFF' stroke='%233B2A4A' stroke-width='2.4' stroke-linejoin='round'/><circle cx='9.5' cy='10' r='1.7' fill='white' opacity='.85'/></svg>");
+  --cur-paw: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 32 32'><g fill='%233B2A4A' stroke='%233B2A4A' stroke-width='4.4' stroke-linejoin='round'><ellipse cx='16' cy='21' rx='8.5' ry='6.5'/><circle cx='7.5' cy='13' r='3.2'/><circle cx='13' cy='8.5' r='3.4'/><circle cx='19.5' cy='8.5' r='3.4'/><circle cx='25' cy='13' r='3.2'/></g><g fill='%23FFD6E3'><ellipse cx='16' cy='21' rx='8.5' ry='6.5'/><circle cx='7.5' cy='13' r='3.2'/><circle cx='13' cy='8.5' r='3.4'/><circle cx='19.5' cy='8.5' r='3.4'/><circle cx='25' cy='13' r='3.2'/></g></svg>");
+  --cur-fist: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 32 32'><g fill='%233B2A4A' stroke='%233B2A4A' stroke-width='4.4' stroke-linejoin='round'><ellipse cx='16' cy='20' rx='9.5' ry='7'/><circle cx='8.5' cy='14' r='2.6'/><circle cx='13' cy='12' r='2.6'/><circle cx='19' cy='12' r='2.6'/><circle cx='23.5' cy='14' r='2.6'/></g><g fill='%23FFD6E3'><ellipse cx='16' cy='20' rx='9.5' ry='7'/><circle cx='8.5' cy='14' r='2.6'/><circle cx='13' cy='12' r='2.6'/><circle cx='19' cy='12' r='2.6'/><circle cx='23.5' cy='14' r='2.6'/></g></svg>");
+}
+html, body { cursor: var(--cur-arrow) 4 2, default; }
+/* trình duyệt tự đặt cursor riêng cho các phần tử này nên không thừa kế được từ body */
+a, button, summary, select, label, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [role="switch"],
+input[type="checkbox"], input[type="radio"], input[type="button"], input[type="submit"], .cursor-default, .cursor-pointer {
+  cursor: var(--cur-arrow) 4 2, default;
+}
+:disabled, [aria-disabled="true"] { cursor: var(--cur-arrow) 4 2, not-allowed; }
+.win-titlebar { cursor: var(--cur-paw) 10 5, grab; }
+/* ba nút tác vụ nằm trong thanh tiêu đề nhưng dùng mũi tên thường */
+.win-titlebar .win-ctrl { cursor: var(--cur-arrow) 4 2, default; }
+.win-titlebar:active { cursor: var(--cur-fist) 12 10, grabbing; }
+/* đang kéo cửa sổ: giữ bàn tay nắm dù chuột trượt ra khỏi thanh tiêu đề */
+html.win-dragging, html.win-dragging * { cursor: var(--cur-fist) 12 10, grabbing !important; }
+
+/* ---- Nút cửa sổ dạng bong bóng kẹo ---- */
+.win-bubble {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 2px solid #3b2a4a;
+  color: #3b2a4a;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.22));
+  box-shadow: inset 0 -3px 4px rgba(255, 255, 255, 0.45), 0 2px 0 rgba(59, 42, 74, 0.25);
+  transition: background 0.15s, box-shadow 0.15s, color 0.15s;
+  outline: none;
+}
+/* vệt sáng bóng trên đỉnh bong bóng */
+.win-bubble::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 9px;
+  height: 5px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  transform: rotate(-22deg);
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.win-bubble:hover,
+.win-bubble:focus-visible {
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 125%, rgba(255, 255, 255, 0.5) 0, transparent 55%),
+    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--c) 70%, white), var(--c));
+  box-shadow: inset 0 -3px 5px rgba(0, 0, 0, 0.16), 0 0 12px var(--c), 0 2px 0 rgba(59, 42, 74, 0.35);
+}
+.win-bubble:hover::after,
+.win-bubble:focus-visible::after { opacity: 1; }
+.win-bubble:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

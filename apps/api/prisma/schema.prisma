@@ -1,0 +1,437 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Channel {
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  LINKEDIN
+  YOUTUBE
+  EMAIL
+  BLOG
+}
+
+enum ContentStatus {
+  DRAFT
+  READY
+  SCHEDULED
+  DONE
+}
+
+enum GenerationStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum GenerationKind {
+  TEXT
+  IMAGE
+}
+
+enum AssetKind {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  REAUTH_REQUIRED
+  DISCONNECTED
+}
+
+enum PublicationStatus {
+  QUEUED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum ReferenceKind {
+  TEXT
+  URL
+  ASSET
+}
+
+enum ReferencePurpose {
+  WRITING_STYLE
+  KNOWLEDGE
+  VISUAL_STYLE
+}
+
+enum PublicationSource {
+  MARKETOS
+  IMPORTED
+}
+
+enum ActivityType {
+  GENERATION_REQUESTED
+  GENERATION_COMPLETED
+  GENERATION_FAILED
+  GENERATION_CANCELLED
+  CONTENT_SAVED
+  CONTENT_EDITED
+  CONTENT_SCHEDULED
+  ASSET_SAVED
+  CONNECTION_CONNECTED
+  CONNECTION_DISCONNECTED
+  PUBLICATION_REQUESTED
+  PUBLICATION_SUCCEEDED
+  PUBLICATION_FAILED
+}
+
+model User {
+  id              String                  @id @default(cuid())
+  clerkId         String                  @unique
+  email           String?
+  name            String?
+  isDemo          Boolean                 @default(false)
+  projects        Project[]
+  generations     Generation[]
+  personalization PersonalizationProfile?
+  references      PersonalReference[]
+  activities      UserActivity[]
+  behavior        BehaviorProfile?
+  createdAt       DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime                @updatedAt @db.Timestamptz(3)
+}
+
+model Project {
+  id                 String              @id @default(cuid())
+  ownerId            String
+  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name               String
+  color              String?
+  icon               String?
+  deletedAt          DateTime?           @db.Timestamptz(3)
+  brandBrief         BrandBrief?
+  contents           ContentItem[]
+  generations        Generation[]
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  campaigns          Campaign[]
+  assets             Asset[]
+  marketingTasks     MarketingTask[]
+  channelConnections ChannelConnection[]
+  references         PersonalReference[]
+  activities         UserActivity[]
+
+  @@index([ownerId, deletedAt, createdAt])
+}
+
+model BrandBrief {
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  product     String
+  audience    String
+  tone        String
+  keyMessages String[] @default([])
+  avoidWords  String[] @default([])
+  samplePosts String[] @default([])
+  brandColors String[] @default([])
+  visualStyle String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model ContentItem {
+  id           String          @id @default(cuid())
+  projectId    String
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationId String?
+  generation   Generation?     @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  campaignId   String?
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  channel      Channel
+  title        String
+  body         String
+  hashtags     String[]        @default([])
+  cta          String?
+  status       ContentStatus   @default(DRAFT)
+  scheduledAt  DateTime?       @db.Timestamptz(3)
+  createdAt    DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime        @updatedAt @db.Timestamptz(3)
+  assets       ContentAsset[]
+  tasks        MarketingTask[]
+  publications Publication[]
+  activities   UserActivity[]
+
+  @@index([projectId, status, createdAt])
+  @@index([projectId, scheduledAt])
+  @@index([generationId])
+  @@index([campaignId, status])
+}
+
+model Generation {
+  id                      String           @id @default(cuid())
+  projectId               String?
+  project                 Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  userId                  String
+  user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId               String
+  input                   Json
+  briefSnapshot           Json
+  personalizationSnapshot Json?
+  model                   String
+  kind                    GenerationKind   @default(TEXT)
+  requestedOutputs        Int              @default(1)
+  completedOutputs        Int              @default(0)
+  quotaUnits              Int              @default(1)
+  status                  GenerationStatus @default(PENDING)
+  tokensIn                Int?
+  tokensOut               Int?
+  errorCode               String?
+  contents                ContentItem[]
+  assets                  Asset[]
+  activities              UserActivity[]
+  createdAt               DateTime         @default(now()) @db.Timestamptz(3)
+  completedAt             DateTime?        @db.Timestamptz(3)
+
+  @@unique([userId, requestId])
+  @@index([userId, kind, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model Campaign {
+  id             String          @id @default(cuid())
+  projectId      String
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  objective      String
+  targetAudience String?
+  status         CampaignStatus  @default(DRAFT)
+  startsAt       DateTime?       @db.Timestamptz(3)
+  endsAt         DateTime?       @db.Timestamptz(3)
+  budget         Decimal?        @db.Decimal(18, 2)
+  currency       String?         @db.VarChar(3)
+  contents       ContentItem[]
+  tasks          MarketingTask[]
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId, status, createdAt])
+}
+
+model Asset {
+  id           String              @id @default(cuid())
+  projectId    String
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationId String?
+  generation   Generation?         @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  kind         AssetKind
+  name         String
+  storageKey   String              @unique
+  mimeType     String
+  byteSize     BigInt
+  width        Int?
+  height       Int?
+  altText      String?
+  contents     ContentAsset[]
+  references   PersonalReference[]
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId, kind, createdAt])
+  @@index([generationId])
+}
+
+model ContentAsset {
+  contentId String
+  content   ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  position  Int         @default(0)
+
+  @@id([contentId, assetId])
+  @@unique([contentId, position])
+  @@index([assetId])
+}
+
+model MarketingTask {
+  id          String       @id @default(cuid())
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  campaignId  String?
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  contentId   String?
+  content     ContentItem? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  status      TaskStatus   @default(TODO)
+  dueAt       DateTime?    @db.Timestamptz(3)
+  completedAt DateTime?    @db.Timestamptz(3)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId, status, dueAt])
+  @@index([campaignId])
+  @@index([contentId])
+}
+
+model ChannelConnection {
+  id                String           @id @default(cuid())
+  projectId         String
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  channel           Channel
+  externalAccountId String
+  displayName       String
+  status            ConnectionStatus @default(CONNECTED)
+  credentialRef     String?
+  grantedScopes     String[]         @default([])
+  lastSyncedAt      DateTime?        @db.Timestamptz(3)
+  publications      Publication[]
+  activities        UserActivity[]
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, channel, externalAccountId])
+}
+
+model Publication {
+  id              String              @id @default(cuid())
+  contentId       String?
+  content         ContentItem?        @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  connectionId    String
+  connection      ChannelConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  requestId       String
+  source          PublicationSource   @default(MARKETOS)
+  payloadSnapshot Json
+  status          PublicationStatus   @default(QUEUED)
+  scheduledAt     DateTime?           @db.Timestamptz(3)
+  publishedAt     DateTime?           @db.Timestamptz(3)
+  externalPostId  String?
+  externalUrl     String?
+  errorCode       String?
+  metrics         PublicationMetric[]
+  activities      UserActivity[]
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@unique([connectionId, requestId])
+  @@unique([connectionId, externalPostId])
+  @@index([connectionId, status, scheduledAt])
+  @@index([contentId])
+}
+
+model PublicationMetric {
+  id            String      @id @default(cuid())
+  publicationId String
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  measuredAt    DateTime    @db.Timestamptz(3)
+  impressions   BigInt?
+  reach         BigInt?
+  clicks        BigInt?
+  likes         BigInt?
+  comments      BigInt?
+  shares        BigInt?
+  createdAt     DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@unique([publicationId, measuredAt])
+}
+
+model PersonalizationProfile {
+  userId                  String    @id
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language                String    @default("vi")
+  timezone                String    @default("Asia/Saigon")
+  preferredChannels       Channel[] @default([])
+  preferredTopics         String[]  @default([])
+  preferredTones          String[]  @default([])
+  writingGuidelines       String?
+  visualPreferences       String?
+  avoidWords              String[]  @default([])
+  personalizationEnabled  Boolean   @default(true)
+  behaviorTrackingEnabled Boolean   @default(false)
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime  @updatedAt @db.Timestamptz(3)
+}
+
+model PersonalReference {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assetId     String?
+  asset       Asset?           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind        ReferenceKind
+  purpose     ReferencePurpose @default(KNOWLEDGE)
+  title       String
+  description String?
+  contentText String?
+  sourceUrl   String?
+  enabled     Boolean          @default(true)
+  version     Int              @default(1)
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, projectId, enabled])
+  @@index([projectId])
+  @@index([assetId])
+}
+
+model UserActivity {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId       String
+  type          ActivityType
+  projectId     String?
+  project       Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationId  String?
+  generation    Generation?        @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  contentId     String?
+  content       ContentItem?       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  publicationId String?
+  publication   Publication?       @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  connectionId  String?
+  connection    ChannelConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  properties    Json               @default("{}")
+  occurredAt    DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, eventId])
+  @@index([userId, occurredAt])
+  @@index([userId, type, occurredAt])
+  @@index([projectId, occurredAt])
+  @@index([generationId])
+  @@index([contentId])
+  @@index([publicationId])
+  @@index([connectionId])
+}
+
+model BehaviorProfile {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signals     Json     @default("{}")
+  sampleCount Int      @default(0)
+  windowStart DateTime @db.Timestamptz(3)
+  windowEnd   DateTime @db.Timestamptz(3)
+  version     Int      @default(1)
+  computedAt  DateTime @default(now()) @db.Timestamptz(3)
+}

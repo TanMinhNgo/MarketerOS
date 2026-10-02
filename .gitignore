@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.log
+
+/packages/docs/*.md
+# Tài liệu nội bộ, chưa push
+packages/docs/

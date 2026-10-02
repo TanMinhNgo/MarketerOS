@@ -1,0 +1,116 @@
+import {
+  ConflictException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { GenerateContentInput } from '@marketos/shared';
+import type { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class AiRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  brief(projectId: string, ownerId: string) {
+    return this.prisma.brandBrief.findFirst({
+      where: { projectId, project: { ownerId, deletedAt: null } },
+    });
+  }
+
+  reserve(
+    projectId: string,
+    userId: string,
+    requestId: string,
+    input: GenerateContentInput,
+    briefSnapshot: Prisma.InputJsonValue,
+    model: string,
+    limit: number,
+    start: Date,
+    end: Date,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+      const projects = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${userId} AND "deletedAt" IS NULL FOR UPDATE`;
+      if (!projects.length) throw new NotFoundException();
+      if (
+        await tx.generation.findUnique({
+          where: { userId_requestId: { userId, requestId } },
+          select: { id: true },
+        })
+      )
+        throw new ConflictException({
+          code: 'CONFLICT',
+          message: 'Request ID đã được sử dụng; tạo ID mới để thử lại.',
+          details: null,
+        });
+      await tx.generation.updateMany({
+        where: {
+          userId,
+          kind: 'TEXT',
+          status: 'PENDING',
+          createdAt: { lt: new Date(Date.now() - 30 * 60_000) },
+        },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorCode: 'INTERRUPTED',
+        },
+      });
+      const usage = await tx.generation.aggregate({
+        where: { userId, kind: 'TEXT', createdAt: { gte: start, lt: end } },
+        _sum: { quotaUnits: true },
+      });
+      if ((usage._sum.quotaUnits ?? 0) + 1 > limit)
+        throw new HttpException(
+          {
+            code: 'QUOTA_EXCEEDED',
+            message: 'Bạn đã dùng hết lượt tạo nội dung trong kỳ này.',
+            details: {
+              limit,
+              used: usage._sum.quotaUnits ?? 0,
+              resetAt: end.toISOString(),
+            },
+          },
+          429,
+        );
+      return tx.generation.create({
+        data: {
+          projectId,
+          userId,
+          requestId,
+          input,
+          briefSnapshot,
+          model,
+          kind: 'TEXT',
+          requestedOutputs: 3,
+          quotaUnits: 1,
+          status: 'PENDING',
+        },
+        select: { id: true },
+      });
+    });
+  }
+
+  finish(
+    id: string,
+    status: 'SUCCEEDED' | 'FAILED' | 'CANCELLED',
+    tokensIn: number | null,
+    tokensOut: number | null,
+    errorCode: string | null,
+  ) {
+    return this.prisma.generation.updateMany({
+      where: { id, status: 'PENDING' },
+      data: {
+        status,
+        completedOutputs: status === 'SUCCEEDED' ? 3 : 0,
+        completedAt: new Date(),
+        tokensIn,
+        tokensOut,
+        errorCode,
+      },
+    });
+  }
+}
