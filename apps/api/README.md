@@ -61,10 +61,10 @@ Không triển khai demo-ticket.
 | GET /api/projects/:projectId/brand-brief | Bearer Clerk | 200 BrandBriefResponse; chưa có brief trả 404 |
 | PUT /api/projects/:projectId/brand-brief | Bearer Clerk | 200 BrandBriefResponse; create/update một brief |
 | POST /api/projects/:projectId/generate | Bearer Clerk + Idempotency-Key UUID | 200 SSE: variant.delta, variant.done, done/error; cần Brand Brief |
-| GET /api/projects/:projectId/contents | Bearer Clerk | 200 ContentListResponse; page/limit/status tùy chọn |
+| GET /api/projects/:projectId/contents | Bearer Clerk | 200 ContentListResponse; page/limit/status, from/to hoặc unscheduled=true |
 | POST /api/projects/:projectId/contents | Bearer Clerk | 201 ContentResponse; lưu DRAFT, generationId tùy chọn |
 | GET /api/projects/:projectId/contents/:contentId | Bearer Clerk | 200 ContentResponse |
-| PATCH /api/projects/:projectId/contents/:contentId | Bearer Clerk | 200 ContentResponse; sửa title/body/hashtags/cta |
+| PATCH /api/projects/:projectId/contents/:contentId | Bearer Clerk | 200 ContentResponse; sửa title/body/hashtags/cta hoặc status/scheduledAt |
 | DELETE /api/projects/:projectId/contents/:contentId | Bearer Clerk | 200 ContentResponse; xóa nội dung |
 
 ProjectResponse gồm id, name, color, icon, deletedAt, createdAt, updatedAt; timestamps ISO 8601.
