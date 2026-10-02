@@ -22,7 +22,7 @@ export class BillingController {
   @ApiOkResponse({
     schema: apiSchema(BillingUsageResponseSchema),
     description:
-      'Own verified plan/features, active projects and monthly UTC TEXT usage. No IMAGE/storage limits.',
+      'Own verified plan/features, active projects and monthly UTC TEXT usage. Optional assistant usage for verified Pro ai_assistant entitlement. No IMAGE/storage limits.',
   })
   usage(@CurrentUser() user: AuthUser) {
     return this.billing.usage(user);
