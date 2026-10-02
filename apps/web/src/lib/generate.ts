@@ -1,11 +1,14 @@
 import {
   ApiErrorSchema,
   GenerationDoneSchema,
+  SingleVariantDoneSchema,
   VariantDeltaSchema,
   VariantDoneSchema,
   type GenerateContentInput,
   type GeneratedVariant,
+  type GenerateVariantInput,
 } from "@marketos/shared";
+import type { z } from "zod";
 import { ApiError, request } from "./api-client";
 import { createSseParser } from "./sse";
 
@@ -19,10 +22,17 @@ export type GenerateEvent =
  * Lỗi trước khi stream (400/401/404/409/429/503) ném ApiError từ request(); lỗi giữa chừng
  * (sự kiện `error`) cũng ném ApiError. Huỷ bằng AbortSignal thì ném AbortError.
  */
-export async function streamGenerate(projectId: string, input: GenerateContentInput, { signal, onEvent }: { signal?: AbortSignal; onEvent: (e: GenerateEvent) => void }): Promise<void> {
-  const res = await request(`/api/projects/${projectId}/generate`, {
+export const streamGenerate = (projectId: string, input: GenerateContentInput, opts: StreamOptions) => streamSse(`/api/projects/${projectId}/generate`, input, GenerationDoneSchema, opts);
+
+/** Tạo lại một biến thể (`index`), viết khác các biến thể `others` đang giữ. Sự kiện `done` chỉ có 1 biến thể. */
+export const streamRegenerate = (projectId: string, body: GenerateVariantInput, opts: StreamOptions) => streamSse(`/api/projects/${projectId}/generate/variant`, body, SingleVariantDoneSchema, opts);
+
+type StreamOptions = { signal?: AbortSignal; onEvent: (e: GenerateEvent) => void };
+
+async function streamSse(path: string, body: unknown, doneSchema: z.ZodType<{ generationId: string; variants: GeneratedVariant[] }>, { signal, onEvent }: StreamOptions): Promise<void> {
+  const res = await request(path, {
     method: "POST",
-    body: input,
+    body,
     signal,
     headers: { "Idempotency-Key": crypto.randomUUID(), Accept: "text/event-stream" },
   });
@@ -43,7 +53,7 @@ export async function streamGenerate(projectId: string, input: GenerateContentIn
       const p = VariantDoneSchema.safeParse(payload);
       if (p.success) onEvent({ type: "variant", ...p.data });
     } else if (event === "done") {
-      const p = GenerationDoneSchema.safeParse(payload);
+      const p = doneSchema.safeParse(payload);
       if (p.success) onEvent({ type: "done", ...p.data });
     } else if (event === "error") {
       const p = ApiErrorSchema.safeParse(payload);

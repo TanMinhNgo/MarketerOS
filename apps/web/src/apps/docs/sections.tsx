@@ -143,7 +143,7 @@ export const SECTIONS: DocSection[] = [
     summary: "Folders for your brands, clients and campaigns.",
     body: (
       <>
-        <P>A project holds everything for one brand: its Brand Brief now, and its content and calendar as those apps arrive. You need to be signed in.</P>
+        <P>A project holds everything for one brand: its Brand Brief, its saved content and its calendar. You need to be signed in.</P>
         <H>Create a project</H>
         <Steps>
           <Step title="Open Projects">Double-click the Projects folder, or choose Projects in the menu bar.</Step>
@@ -194,6 +194,47 @@ export const SECTIONS: DocSection[] = [
           ]}
         />
         <Callout kind="note">Product, audience and tone are required. Red messages under a field tell you what to fix.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "studio",
+    title: "Content Studio",
+    summary: "Let the AI write post variants from your brief.",
+    body: (
+      <>
+        <P>Content Studio writes for the <strong>selected project</strong>, in the language and voice of its Brand Brief. The project needs a brief first; if it has none, the app offers a button to open Brand Brief.</P>
+        <Steps>
+          <Step title="Pick a channel">Facebook, Instagram, TikTok, LinkedIn, YouTube, Email or Blog. Each has its own length and format rules.</Step>
+          <Step title="Describe the post">Fill in the goal and topic, and add notes if you like.</Step>
+          <Step title="Generate">Three variants appear as the AI writes them. Press Stop to cancel.</Step>
+          <Step title="Keep the best">Edit a variant in place, copy it, or press <strong>Save as draft</strong>. Not happy with one? Press <strong>Regenerate</strong> on that card to get a new version while the others stay. Regenerates are cheaper: every 3 count as 1 generation (the 1st of each 3 is counted, the next 2 are free), across all your projects each month.</Step>
+        </Steps>
+        <H>Review and approve</H>
+        <P>Every saved draft starts as <strong>Needs review</strong>. Read it, press <strong>Approve</strong> and tick the checklist. Only approved content can go on the calendar.</P>
+        <Callout kind="tip">If a draft still has text in brackets, such as [Business address] or {"{{unsubscribe_link}}"}, the checklist warns you to fill it in before posting.</Callout>
+        <Callout kind="note">Editing an approved or scheduled post sends it back to Needs review. Posts marked Done can no longer be edited.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "calendar",
+    title: "Content Calendar",
+    summary: "Schedule approved content by dragging it onto a day.",
+    body: (
+      <>
+        <Table
+          head={["I want to…", "Do this"]}
+          rows={[
+            ["Schedule a post", "Drag it from the Unscheduled column onto a day. It is set for 9:00 AM; open it to change the time."],
+            ["Move it to another day", "Drag it to the new day. The time stays the same."],
+            ["Unschedule it", "Drag it back to the Unscheduled column. It stays approved."],
+            ["Change status or time", "Click it to open details, then pick a status, date and time and press Save."],
+            ["Mark it as posted", "Open it and set the status to Done."],
+            ["Switch views", "Use Month or Week at the top right, and the arrows or Today to move around."],
+          ]}
+        />
+        <Callout kind="note">Drafts that still need review show a dashed border and a Review tag. Approve them before they can be scheduled.</Callout>
       </>
     ),
   },

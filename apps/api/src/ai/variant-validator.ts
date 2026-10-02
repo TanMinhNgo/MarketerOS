@@ -1,9 +1,18 @@
-import type { GenerateContentInput, GeneratedVariant } from '@marketos/shared';
+import type {
+  ContentLanguage,
+  GenerateContentInput,
+  GeneratedVariant,
+} from '@marketos/shared';
 import { channelPrompts } from './channel-prompts';
 
 type Channel = GenerateContentInput['channel'];
 
-const words = (value: string) => value.trim().match(/\S+/gu)?.length ?? 0;
+const words = (value: string, language: ContentLanguage) =>
+  ['zh', 'ja', 'th'].includes(language)
+    ? [
+        ...new Intl.Segmenter(language, { granularity: 'word' }).segment(value),
+      ].filter((part) => part.isWordLike).length
+    : (value.trim().match(/\S+/gu)?.length ?? 0);
 const characters = (value: string) => [...value].length;
 const normalize = (value: string) =>
   value
@@ -38,11 +47,14 @@ export function validateVariants(
   channel: Channel,
   avoidWords: string[],
   businessAddress: string | null = null,
+  language: ContentLanguage = 'vi',
+  requestedOutputs: 1 | 3 = 3,
 ): string[] {
   const spec = channelPrompts[channel];
   const { limits } = spec;
   const errors: string[] = [];
-  if (variants.length !== 3) errors.push('Phải có đúng 3 biến thể.');
+  if (variants.length !== requestedOutputs)
+    errors.push(`Phải có đúng ${requestedOutputs} biến thể.`);
   for (const [index, variant] of variants.entries()) {
     const field = (name: string) => `variants[${index}].${name}`;
     if (
@@ -50,9 +62,15 @@ export function validateVariants(
       characters(variant.title) > limits.titleMax
     )
       errors.push(`${field('title')} quá ${limits.titleMax} ký tự.`);
-    if (limits.bodyMin !== undefined && words(variant.body) < limits.bodyMin)
+    if (
+      limits.bodyMin !== undefined &&
+      words(variant.body, language) < limits.bodyMin
+    )
       errors.push(`${field('body')} dưới ${limits.bodyMin} từ.`);
-    if (limits.bodyMax !== undefined && words(variant.body) > limits.bodyMax)
+    if (
+      limits.bodyMax !== undefined &&
+      words(variant.body, language) > limits.bodyMax
+    )
       errors.push(`${field('body')} quá ${limits.bodyMax} từ.`);
     if (
       limits.captionMax !== undefined &&
@@ -85,9 +103,12 @@ export function validateVariants(
       errors.push(`${field('body')} lặp lại hashtag.`);
     if (variant.cta.trim() && body.includes(normalize(variant.cta)))
       errors.push(`${field('body')} lặp lại CTA.`);
-    if (channel === 'FACEBOOK' && words(variant.body.split(/\r?\n/u)[0]) >= 20)
+    if (
+      channel === 'FACEBOOK' &&
+      words(variant.body.split(/\r?\n/u)[0], language) >= 20
+    )
       errors.push(`${field('body')} hook phải dưới 20 từ.`);
-    if (channel === 'TIKTOK' && words(variant.title) > 10)
+    if (channel === 'TIKTOK' && words(variant.title, language) > 10)
       errors.push(`${field('title')} quá 10 từ.`);
     if (channel === 'YOUTUBE' && Buffer.byteLength(variant.body, 'utf8') > 5000)
       errors.push(`${field('body')} quá 5.000 byte UTF-8.`);

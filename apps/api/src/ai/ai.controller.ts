@@ -25,7 +25,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiErrorSchema,
   GenerateContentInputSchema,
+  GenerateVariantInputSchema,
   type GenerateContentInput,
+  type GenerateVariantInput,
 } from '@marketos/shared';
 import type { Response } from 'express';
 import { z } from 'zod';
@@ -67,13 +69,56 @@ export class AiController {
     input: GenerateContentInput,
     @Res() response: Response,
   ) {
+    return this.run(projectId, user, requestId, input, response);
+  }
+
+  @Post('variant')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'UUID mới cho mỗi lần tạo',
+  })
+  @ApiBody({ schema: apiSchema(GenerateVariantInputSchema, 'input') })
+  @ApiOkResponse({
+    description:
+      'SSE: variant.delta/variant.done với index đã gửi; done { generationId, variants: [variant] } (SingleVariantDoneSchema), hoặc error (ApiError). Mỗi 3 lần tạo lại trong kỳ tính 1 TEXT, làm tròn lên; lần 2/3 vẫn được phép khi usage bằng limit. FAILED/CANCELLED vẫn tính.',
+    content: { 'text/event-stream': { schema: { type: 'string' } } },
+  })
+  generateVariant(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+    @Headers('idempotency-key') requestId: string | undefined,
+    @Body(new SchemaPipe(GenerateVariantInputSchema))
+    body: GenerateVariantInput,
+    @Res() response: Response,
+  ) {
+    return this.run(projectId, user, requestId, body.input, response, {
+      others: body.others,
+      index: body.index,
+    });
+  }
+
+  private async run(
+    projectId: string,
+    user: AuthUser,
+    requestId: string | undefined,
+    input: GenerateContentInput,
+    response: Response,
+    single?: Pick<GenerateVariantInput, 'others' | 'index'>,
+  ) {
     if (!z.uuid().safeParse(requestId).success)
       throw new BadRequestException({
         code: 'VALIDATION',
         message: 'Idempotency-Key phải là UUID.',
         details: null,
       });
-    const prepared = await this.ai.prepare(projectId, user, requestId!, input);
+    const prepared = await this.ai.prepare(
+      projectId,
+      user,
+      requestId!,
+      input,
+      single,
+    );
     const abort = new AbortController();
     response.on('close', () => abort.abort());
     response.status(200);

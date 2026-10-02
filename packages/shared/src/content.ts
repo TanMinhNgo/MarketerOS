@@ -38,6 +38,16 @@ export const GenerateContentInputSchema = z
     notes: z.string().trim().max(3000).optional(),
   })
   .strict();
+export const GenerateVariantInputSchema = z
+  .object({
+    input: GenerateContentInputSchema,
+    others: z.array(GeneratedVariantSchema).max(2),
+    index: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  })
+  .strict();
+export const SingleVariantOutputSchema = z
+  .object({ variants: z.array(GeneratedVariantSchema).length(1) })
+  .strict();
 export const VariantDeltaSchema = z
   .object({
     index: z.number().int().min(0).max(2),
@@ -54,6 +64,12 @@ export const GenerationDoneSchema = z
   .object({
     generationId: z.string(),
     variants: GeneratedVariantsSchema.shape.variants,
+  })
+  .strict();
+export const SingleVariantDoneSchema = z
+  .object({
+    generationId: z.string(),
+    variants: SingleVariantOutputSchema.shape.variants,
   })
   .strict();
 
@@ -142,6 +158,9 @@ export const ContentListResponseSchema = z.object({
 });
 
 export type GenerateContentInput = z.infer<typeof GenerateContentInputSchema>;
+export type GenerateVariantInput = z.infer<typeof GenerateVariantInputSchema>;
+export type SingleVariantOutput = z.infer<typeof SingleVariantOutputSchema>;
+export type SingleVariantDone = z.infer<typeof SingleVariantDoneSchema>;
 export type GeneratedVariant = z.infer<typeof GeneratedVariantSchema>;
 export type GeneratedVariants = z.infer<typeof GeneratedVariantsSchema>;
 export type CreateContentInput = z.infer<typeof CreateContentSchema>;

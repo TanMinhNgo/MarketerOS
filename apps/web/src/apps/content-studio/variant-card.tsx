@@ -1,7 +1,7 @@
 "use client";
 
 import type { GeneratedVariant } from "@marketos/shared";
-import { Check, Copy, Save } from "lucide-react";
+import { Check, Copy, RefreshCw, Save } from "lucide-react";
 import { useState } from "react";
 import { notify } from "@/lib/notify/notify";
 import { TagInput } from "@/components/tag-input";
@@ -43,10 +43,14 @@ function Streaming({ index, data }: { index: number; data: Partial<GeneratedVari
   );
 }
 
-/** Biến thể đã xong: sửa trực tiếp, sao chép, lưu thành bản nháp. */
-function Editable({ index, initial, saving, onSave }: { index: number; initial: GeneratedVariant; saving: boolean; onSave: (v: GeneratedVariant) => Promise<void> }) {
+type CardProps = { index: number; saving: boolean; onSave: (v: GeneratedVariant) => Promise<void>; onRegenerate?: () => void };
+
+/** Biến thể đã xong: sửa trực tiếp, sao chép, tạo lại, lưu thành bản nháp. */
+function Editable({ index, initial, saving, onSave, onRegenerate }: CardProps & { initial: GeneratedVariant }) {
   const [v, setV] = useState<GeneratedVariant>(initial);
   const [saved, setSaved] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const edited = v !== initial;
   const set = <K extends keyof GeneratedVariant>(k: K, val: GeneratedVariant[K]) => {
     setV((cur) => ({ ...cur, [k]: val }));
     setSaved(false);
@@ -58,6 +62,18 @@ function Editable({ index, initial, saving, onSave }: { index: number; initial: 
       <div className="flex items-center gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Variant {index + 1}</p>
         <div className="flex-1" />
+        {onRegenerate && (
+          <Button
+            type="button"
+            variant={confirmRegen ? "destructive" : "ghost"}
+            size="sm"
+            title="Write a new version of this variant (every 3 regenerates use 1 generation)"
+            onBlur={() => setConfirmRegen(false)}
+            onClick={() => (edited && !confirmRegen ? setConfirmRegen(true) : onRegenerate())}
+          >
+            <RefreshCw /> {confirmRegen ? "Discard edits?" : "Regenerate"}
+          </Button>
+        )}
         <Button type="button" variant="ghost" size="sm" onClick={() => copyText(variantToText(v))}>
           <Copy /> Copy
         </Button>
@@ -81,7 +97,7 @@ function Editable({ index, initial, saving, onSave }: { index: number; initial: 
   );
 }
 
-export function VariantCard({ index, state, saving, onSave }: { index: number; state: VariantState; saving: boolean; onSave: (v: GeneratedVariant) => Promise<void> }) {
-  if (!state.done) return <Streaming index={index} data={state.data} />;
-  return <Editable index={index} initial={state.data as GeneratedVariant} saving={saving} onSave={onSave} />;
+export function VariantCard({ state, ...props }: CardProps & { state: VariantState }) {
+  if (!state.done) return <Streaming index={props.index} data={state.data} />;
+  return <Editable {...props} initial={state.data as GeneratedVariant} />;
 }

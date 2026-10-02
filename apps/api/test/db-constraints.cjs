@@ -32,7 +32,7 @@ async function run() {
     );
     assert.deepEqual(brief.rows, [{ language: 'vi', businessAddress: null }]);
     await client.query(
-      'INSERT INTO "Generation" (id, "userId", "projectId", "requestId", input, "briefSnapshot", model) VALUES ($1, $2, $3, $1, $4, $4, $1)',
+      'INSERT INTO "Generation" (id, "userId", "projectId", "requestId", input, "briefSnapshot", model, "requestedOutputs") VALUES ($1, $2, $3, $1, $4, $4, $1, 3)',
       [generationId, userId, projectId, {}],
     );
 
@@ -61,6 +61,24 @@ async function run() {
       [generationId],
     );
     await rejectsCheck(
+      'UPDATE "Generation" SET "requestedOutputs" = 1 WHERE id = $1',
+      [generationId],
+    );
+    await client.query('SAVEPOINT regeneration');
+    await client.query(
+      'UPDATE "Generation" SET "requestedOutputs" = 1, "quotaUnits" = 0 WHERE id = $1',
+      [generationId],
+    );
+    await rejectsCheck(
+      'UPDATE "Generation" SET kind = \'IMAGE\' WHERE id = $1',
+      [generationId],
+    );
+    await rejectsCheck(
+      'UPDATE "Generation" SET "quotaUnits" = -1 WHERE id = $1',
+      [generationId],
+    );
+    await client.query('ROLLBACK TO SAVEPOINT regeneration');
+    await rejectsCheck(
       'UPDATE "Generation" SET status = \'SUCCEEDED\', "completedAt" = now() WHERE id = $1',
       [generationId],
     );
@@ -69,11 +87,11 @@ async function run() {
       [randomUUID(), projectId],
     );
     await client.query(
-      "INSERT INTO \"ContentItem\" (id, \"projectId\", channel, title, body, status, \"scheduledAt\", \"updatedAt\") VALUES ($1, $2, 'FACEBOOK', 'test', 'test', 'DRAFT', now(), now())",
+      'INSERT INTO "ContentItem" (id, "projectId", channel, title, body, status, "scheduledAt", "updatedAt") VALUES ($1, $2, \'FACEBOOK\', \'test\', \'test\', \'DRAFT\', now(), now())',
       [randomUUID(), projectId],
     );
     await rejectsCheck(
-      "INSERT INTO \"ContentItem\" (id, \"projectId\", channel, title, body, status, \"scheduledAt\", \"updatedAt\") VALUES ($1, $2, 'FACEBOOK', 'test', 'test', 'READY', now(), now())",
+      'INSERT INTO "ContentItem" (id, "projectId", channel, title, body, status, "scheduledAt", "updatedAt") VALUES ($1, $2, \'FACEBOOK\', \'test\', \'test\', \'READY\', now(), now())',
       [randomUUID(), projectId],
     );
     await rejectsCheck(

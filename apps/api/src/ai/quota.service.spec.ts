@@ -1,4 +1,21 @@
-import { QuotaService } from './quota.service';
+import { QuotaService, textUsage } from './quota.service';
+
+test.each([
+  [0, 0, 0],
+  [0, 1, 1],
+  [0, 2, 1],
+  [0, 3, 1],
+  [0, 4, 2],
+  [2, 0, 2],
+  [2, 1, 3],
+  [2, 3, 3],
+  [2, 4, 4],
+])(
+  'TEXT usage: %i ordinary units + %i regenerations = %i',
+  (units, count, expected) => {
+    expect(textUsage(units, count)).toBe(expected);
+  },
+);
 
 test('keeps TEXT and IMAGE limits separate and resets at a UTC month boundary', () => {
   const quota = new QuotaService();

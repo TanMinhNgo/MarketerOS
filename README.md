@@ -12,12 +12,18 @@ các bản npm cũ có thể báo dependency đã override là invalid.
 
 ```powershell
 npm ci
+docker compose up -d postgres
+# Cấu hình .env theo apps/api/README.md và apps/web/.env.example trước khi chạy.
+npm run build --workspace @marketos/shared
+npm run db:deploy --workspace api
 npm run dev
 ```
 
 Web: `http://localhost:3000`; API: `http://localhost:3001`.
-Hiện API là NestJS starter với `GET /`; các module nghiệp vụ mới là khung trống.
-Chưa kết nối Clerk, PostgreSQL hay OpenAI. `apps/api/.env.example` là mẫu cho bước triển khai tiếp theo.
+API đã có Clerk auth, Projects/Trash, Brand Brief, AI Content Studio qua SSE,
+quota TEXT và API duyệt/lên lịch nội dung. Health public ở `/api/health`, Swagger ở `/docs`.
+Xem [hướng dẫn API](./apps/api/README.md) để cấu hình env, migration và database test riêng.
+Worker tự đăng và giới hạn billing đầy đủ thuộc các phase sau.
 
 Nếu Node của máy thấp hơn 24.15, có thể cài lần đầu bằng Node tạm từ npm:
 
@@ -61,4 +67,5 @@ Build `packages/shared` trước khi chạy riêng app: `npm run build --workspa
   BullMQ/Redis client sẽ thêm khi triển khai worker ở phase mở rộng.
 
 Docker theo tài liệu: `pgvector/pgvector:pg16` và `redis:8.6`.
-`docker-compose.yml` hiện chưa được triển khai.
+`docker-compose.yml` đã có PostgreSQL local riêng trên cổng 5433;
+Redis thuộc profile `jobs`, chưa cần cho Phase 0–5.

@@ -61,6 +61,7 @@ Không triển khai demo-ticket.
 | GET /api/projects/:projectId/brand-brief | Bearer Clerk | 200 BrandBriefResponse; chưa có brief trả 404 |
 | PUT /api/projects/:projectId/brand-brief | Bearer Clerk | 200 BrandBriefResponse; create/update một brief |
 | POST /api/projects/:projectId/generate | Bearer Clerk + Idempotency-Key UUID | 200 SSE: variant.delta, variant.done, done/error; cần Brand Brief |
+| POST /api/projects/:projectId/generate/variant | Bearer Clerk + Idempotency-Key UUID | 200 SSE: một biến thể tại index đã gửi; done.variants có đúng 1 phần tử |
 | GET /api/projects/:projectId/contents | Bearer Clerk | 200 ContentListResponse; page/limit/status, from/to hoặc unscheduled=true |
 | POST /api/projects/:projectId/contents | Bearer Clerk | 201 ContentResponse; lưu DRAFT, generationId tùy chọn |
 | GET /api/projects/:projectId/contents/:contentId | Bearer Clerk | 200 ContentResponse |
@@ -123,6 +124,40 @@ FAILED/CANCELLED vẫn tính lượt để kiểm soát chi phí. 429 QUOTA_EXCE
 Request bị ngắt hoặc server chết có thể để lại PENDING; lần tạo sau đánh dấu bản ghi
 PENDING quá 30 phút thành FAILED, vẫn tính quota và không gọi lại provider.
 Hạn mức này là giả định triển khai khi chưa có quyết định sản phẩm cuối cùng.
+
+### Tạo lại một biến thể
+
+`POST /api/projects/:projectId/generate/variant` nhận strict body
+`{ input: { channel, goal, topic, notes? }, others: GeneratedVariant[], index: 0 | 1 | 2 }`.
+`others` bắt buộc, có 0–2 biến thể đang giữ; model được yêu cầu viết khác chúng.
+Chúng được escape và đặt trong `<other_variants>` như dữ liệu, không phải chỉ dẫn.
+Endpoint dùng cùng Clerk/ownership/rate limit và không tự lưu ContentItem.
+
+SSE dùng `variant.delta`/`variant.done` với đúng `index` đã gửi;
+`done` là `{ generationId, variants: [variant] }` theo `SingleVariantDoneSchema`.
+Luồng ba biến thể và `GeneratedVariantsSchema` không đổi. Frontend cần parse done
+bằng schema riêng, thay đúng một thẻ và giữ các thẻ khác; dùng `generationId`
+mới khi lưu nháp của thẻ vừa tạo lại.
+
+Generation có kind TEXT, requestedOutputs/completedOutputs thành công bằng 1,
+quotaUnits = 0. Theo quyết định 02/10/2026, **3 lần tạo lại trong cùng chu kỳ tính
+1 lượt TEXT, làm tròn lên**: lần 1 tính 1, lần 2/3 không tăng usage, lần 4 tính thêm 1.
+Usage TEXT theo user (mọi project) trong tháng UTC là `SUM(quotaUnits) +
+CEIL(COUNT(Generation TEXT có requestedOutputs = 1) / 3)`. Tạo cả 3 vẫn ghi
+quotaUnits = 1. Tính mọi status, kể cả PENDING/FAILED/CANCELLED; retry sửa đầu ra
+dùng cùng Generation, không tính thêm. Khi usage bằng limit, lần 2/3 vẫn được
+chấp nhận; chỉ trả 429 nếu usage sau reservation vượt limit. details.used là
+usage hiện tại theo công thức mới. Đếm và reservation cùng transaction dưới khóa
+User để các request đồng thời không vượt quota.
+
+Migration `20261002030000_regeneration_quota` chuyển mọi Generation TEXT
+requestedOutputs = 1 cũ sang quotaUnits = 0 và cập nhật CHECK constraint;
+không thêm cột. Dừng API cũ, chạy migration rồi chạy API mới để tránh ghi quota
+theo quy tắc cũ. Chưa có API trả usage riêng; request/response/SSE không đổi.
+Idempotency key dùng chung namespace với `/generate`: key đã dùng ở một trong hai
+endpoint trả 409 CONFLICT. Body/key sai trả 400 VALIDATION, thiếu/sai auth 401,
+ownership/Trash/brief thiếu 404, quota/rate limit 429, cấu hình/provider/DB lỗi 503;
+lỗi sau khi mở SSE trả event `error` theo ApiError.
 
 POST contents chỉ lưu DRAFT. Nếu gắn generationId, backend xác minh Generation đã
 SUCCEEDED, cùng user/project/kênh. GET/PATCH/DELETE chỉ truy cập nội dung thuộc project

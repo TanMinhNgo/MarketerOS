@@ -6,7 +6,55 @@ const {
   CreateContentSchema,
   UpdateContentSchema,
   ContentListQuerySchema,
+  GenerateVariantInputSchema,
+  SingleVariantOutputSchema,
+  SingleVariantDoneSchema,
 } = require('../dist/index.js');
+
+test('single-variant contracts enforce strict input, index and output cardinality', () => {
+  const variant = { title: 'A', body: 'B', hashtags: [], cta: '' };
+  const body = {
+    input: { channel: 'FACEBOOK', goal: 'G', topic: 'T' },
+    others: [],
+    index: 2,
+  };
+  for (const others of [[], [variant], [variant, variant]]) {
+    for (const index of [0, 1, 2])
+      assert.equal(
+        GenerateVariantInputSchema.safeParse({ ...body, others, index })
+          .success,
+        true,
+      );
+  }
+  for (const invalid of [
+    { ...body, others: [variant, variant, variant] },
+    { ...body, index: 3 },
+    { ...body, index: 1.5 },
+    { ...body, extra: true },
+    { ...body, input: { ...body.input, extra: true } },
+    { ...body, others: [{ ...variant, extra: true }] },
+    { input: body.input, index: 0 },
+  ])
+    assert.equal(GenerateVariantInputSchema.safeParse(invalid).success, false);
+  for (const variants of [[], [variant, variant, variant]]) {
+    assert.equal(
+      SingleVariantOutputSchema.safeParse({ variants }).success,
+      false,
+    );
+    assert.equal(
+      SingleVariantDoneSchema.safeParse({ generationId: 'g', variants })
+        .success,
+      false,
+    );
+  }
+  assert.equal(
+    SingleVariantDoneSchema.safeParse({
+      generationId: 'g',
+      variants: [variant],
+    }).success,
+    true,
+  );
+});
 
 test('generation and draft contracts reject extra fields and incomplete variants', () => {
   assert.equal(
