@@ -20,6 +20,7 @@ import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
   ApiServiceUnavailableResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { apiSchema } from '../common/api-schema';
 import {
@@ -69,13 +70,18 @@ export class ProjectsController {
     return this.projects.list(user.id, query, true);
   }
   @Post()
+  @ApiForbiddenResponse({
+    schema: apiSchema(ApiErrorSchema),
+    description:
+      'PLAN_LIMIT; details: { limit, used, plan } (active projects).',
+  })
   @ApiBody({ schema: apiSchema(CreateProjectSchema, 'input') })
   @ApiCreatedResponse({ schema: apiSchema(ProjectResponseSchema) })
   create(
     @CurrentUser() user: AuthUser,
     @Body(new SchemaPipe(CreateProjectSchema)) data: CreateProjectInput,
   ) {
-    return this.projects.create(user.id, data);
+    return this.projects.create(user.id, data, user.plan);
   }
   @Get(':projectId')
   @ApiOkResponse({ schema: apiSchema(ProjectResponseSchema) })
@@ -98,8 +104,13 @@ export class ProjectsController {
     return this.projects.trash(id, user.id);
   }
   @Post(':projectId/restore')
+  @ApiForbiddenResponse({
+    schema: apiSchema(ApiErrorSchema),
+    description:
+      'PLAN_LIMIT; details: { limit, used, plan } (active projects).',
+  })
   @ApiCreatedResponse({ schema: apiSchema(ProjectResponseSchema) })
   restore(@CurrentUser() user: AuthUser, @Param('projectId') id: string) {
-    return this.projects.restore(id, user.id);
+    return this.projects.restore(id, user.id, user.plan);
   }
 }

@@ -3,6 +3,7 @@ import type {
   CreateProjectInput,
   ProjectListQuery,
   UpdateProjectInput,
+  PlanKey,
 } from '@marketos/shared';
 import { Prisma } from '../generated/prisma/client';
 import { ProjectsRepository } from './projects.repository';
@@ -16,8 +17,8 @@ export class ProjectsService {
   get(id: string, ownerId: string) {
     return this.projects.owned(id, ownerId);
   }
-  create(ownerId: string, data: CreateProjectInput) {
-    return this.projects.create(ownerId, data);
+  create(ownerId: string, data: CreateProjectInput, plan: PlanKey) {
+    return this.projects.create(ownerId, data, plan);
   }
   update(id: string, ownerId: string, data: UpdateProjectInput) {
     return this.write(() => this.projects.update(id, ownerId, data));
@@ -25,8 +26,8 @@ export class ProjectsService {
   trash(id: string, ownerId: string) {
     return this.write(() => this.projects.trash(id, ownerId));
   }
-  restore(id: string, ownerId: string) {
-    return this.write(() => this.projects.restore(id, ownerId));
+  restore(id: string, ownerId: string, plan: PlanKey) {
+    return this.write(() => this.projects.restore(id, ownerId, plan));
   }
   private async write<T>(operation: () => Promise<T>): Promise<T> {
     try {

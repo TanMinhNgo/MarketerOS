@@ -1,18 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import type { PlanKey } from '@marketos/shared';
+import type { Prisma } from '../generated/prisma/client';
+import { PLAN_LIMITS } from '../billing/plan-limits';
 
-type Kind = 'TEXT' | 'IMAGE';
 export const textUsage = (quotaUnits: number, regenerations: number) =>
   quotaUnits + Math.ceil(regenerations / 3);
-const limits: Record<PlanKey, Record<Kind, number>> = {
-  free: { TEXT: 10, IMAGE: 2 },
-  pro: { TEXT: 200, IMAGE: 50 },
-};
+
+export async function readTextUsage(
+  db: Prisma.TransactionClient,
+  userId: string,
+  start: Date,
+  end: Date,
+) {
+  const where = {
+    userId,
+    kind: 'TEXT' as const,
+    createdAt: { gte: start, lt: end },
+  };
+  const usage = await db.generation.aggregate({
+    where,
+    _sum: { quotaUnits: true },
+  });
+  // ponytail: TEXT/1 denotes regeneration; add a discriminator before other single-output TEXT flows.
+  const regenerations = await db.generation.count({
+    where: { ...where, requestedOutputs: 1 },
+  });
+  const units = usage._sum.quotaUnits ?? 0;
+  return { units, regenerations, used: textUsage(units, regenerations) };
+}
 
 @Injectable()
 export class QuotaService {
-  limit(plan: PlanKey, kind: Kind) {
-    return limits[plan][kind];
+  limit(plan: PlanKey) {
+    return PLAN_LIMITS[plan].text;
   }
 
   period(now = new Date()) {

@@ -19,7 +19,7 @@ test('project mutations map missing rows to 404 and preserve other errors', asyn
   for (const operation of [
     () => service.update('project', 'owner', { name: 'Test' }),
     () => service.trash('project', 'owner'),
-    () => service.restore('project', 'owner'),
+    () => service.restore('project', 'owner', 'free'),
   ]) {
     await expect(operation()).rejects.toBeInstanceOf(NotFoundException);
   }

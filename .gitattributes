@@ -1,0 +1,6 @@
+# Prettier dùng endOfLine: lf; giữ LF cả trên Windows (core.autocrlf=true).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

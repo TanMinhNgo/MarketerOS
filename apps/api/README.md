@@ -246,5 +246,51 @@ Rate limit dùng memory của từng process, chưa dùng Redis. Chỉ tin IP c�
 proxy đáng tin cậy; không tự bật trust proxy để nhận X-Forwarded-For tùy ý.
 Test e2e tạo chữ ký bằng secret test riêng, không dùng secret hay xóa tài khoản Clerk thật.
 
+## Billing và giới hạn đã chốt (02/10/2026)
+
+Nguồn cấu hình duy nhất: `src/billing/plan-limits.ts`, dùng shared `PlanKey`.
+Dự án đang hoạt động (`deletedAt IS NULL`): Free 3, Pro 20. TEXT/tháng UTC:
+Free 10, Pro 200. Không cấu hình/enforce/trả IMAGE hay storage vì chưa chốt.
+Số biến thể vẫn 3 cho cả hai gói.
+
+`POST /api/projects` và `POST /api/projects/:projectId/restore` khóa row User,
+đếm và ghi trong cùng transaction. Hết chỗ: 403 `PLAN_LIMIT`,
+`details: { limit, used, plan }`. Trash không chiếm chỗ. Hạ gói không xóa hay
+khóa dự án cũ; chỉ chặn tạo/restore thêm khi đã đạt hoặc vượt giới hạn mới.
+
+`GET /api/billing/usage` cần Bearer Clerk, chỉ đọc dữ liệu user đã xác thực:
+
+```json
+{
+  "plan": "free",
+  "features": [],
+  "period": { "start": "2026-10-01T00:00:00.000Z", "end": "2026-11-01T00:00:00.000Z" },
+  "usage": {
+    "projects": { "used": 0, "limit": 3 },
+    "text": { "used": 0, "limit": 10 }
+  }
+}
+```
+
+Shared `BillingUsageResponseSchema` / `BillingUsageResponse`,
+`PlanLimitDetailsSchema` / `PlanLimitDetails`. Plan và features lấy từ token đã
+verify qua Clerk `has` với scope `u:` (User plans), không lấy quyền từ tổ chức,
+PLAN_CATALOG hay DB. Features có thể
+rỗng, kể cả Pro; entitlement không đồng nghĩa tính năng đã triển khai.
+Usage đọc snapshot RepeatableRead; `used` không bị cắt về limit khi hạ gói.
+
+TEXT dùng cùng hàm đếm với reservation: SUM(quotaUnits) + CEIL(số Generation
+TEXT requestedOutputs=1 / 3), theo user và createdAt trong [start,end), mọi status.
+Tạo 3 biến thể tính 1; lần tạo lại 1/4/7 tăng 1, lần 2/3 của nhóm không tăng.
+429 `QUOTA_EXCEEDED` giữ details `{ limit, used, resetAt }`, resetAt=period.end.
+Helper `requireFeature` chuẩn bị 403 `PLAN_REQUIRED`, details `{ feature }`;
+chưa gắn vào route hiện tại. Không cần migration mới.
+
+Suite `billing.e2e-spec.ts` dùng PostgreSQL test riêng, guard/transaction thật,
+mock ClerkGateway; kiểm tra Free/Pro, create/restore song song, hạ gói, ownership,
+usage tháng/user/status/Trash và Swagger. JWT unit dùng chữ ký RSA và Clerk SDK
+thật để kiểm tra plan/feature/signature/expiry/origin. Chưa xác minh checkout
+sandbox, phiên Clerk browser hoặc OpenAI thật trong thay đổi billing này.
+
 Tham khảo: [Clerk webhooks](https://clerk.com/docs/guides/development/webhooks/syncing),
 [NestJS rate limiting](https://docs.nestjs.com/security/rate-limiting).

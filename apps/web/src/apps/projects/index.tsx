@@ -8,8 +8,9 @@ import { ProjectIcon } from "@/components/project-icon";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ApiError, errorMessage } from "@/lib/api-client";
-import { useProjects, useRestoreProject, useTrashProject } from "@/lib/queries";
+import { useProjects, useRestoreProject, useTrashProject, useUsage } from "@/lib/queries";
 import { cn } from "@/lib/utils";
+import { useWindowStore } from "@/desktop/window-store";
 import { useActiveProject } from "@/stores/active-project";
 import { ProjectDialog } from "./project-dialog";
 import type { ProjectResponse } from "@marketos/shared";
@@ -21,6 +22,10 @@ function ProjectsApp() {
   const trash = useTrashProject();
   const restore = useRestoreProject();
   const [editing, setEditing] = useState<ProjectResponse | "new" | null>(null);
+  const usage = useUsage().data;
+  const openApp = useWindowStore((s) => s.open);
+  // Chỉ để báo trước; backend vẫn kiểm tra lại khi tạo (403 PLAN_LIMIT).
+  const atLimit = !!usage && usage.usage.projects.used >= usage.usage.projects.limit;
 
   const moveToTrash = (p: ProjectResponse) =>
     trash.mutate(p.id, {
@@ -47,9 +52,16 @@ function ProjectsApp() {
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b px-4 py-2.5">
         <h2 className="font-display text-sm font-bold">Your projects</h2>
-        <span className="text-xs text-muted-foreground">{data.total} {data.total === 1 ? "project" : "projects"}</span>
+        <span className="text-xs text-muted-foreground">
+          {usage ? `${usage.usage.projects.used} of ${usage.usage.projects.limit} projects` : `${data.total} ${data.total === 1 ? "project" : "projects"}`}
+        </span>
         <div className="flex-1" />
-        <Button size="sm" onClick={() => setEditing("new")}>
+        {atLimit && (
+          <Button size="sm" variant="ghost" onClick={() => openApp("plans-billing")}>
+            {usage.plan === "free" ? "Upgrade for more" : "Limit reached"}
+          </Button>
+        )}
+        <Button size="sm" disabled={atLimit} title={atLimit ? "You've reached your plan's project limit. Move a project to Trash or upgrade." : undefined} onClick={() => setEditing("new")}>
           <Plus /> New project
         </Button>
       </div>

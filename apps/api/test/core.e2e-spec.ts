@@ -40,7 +40,7 @@ suite('Core API with PostgreSQL and real guard/repositories', () => {
         authenticate: (header: string) => {
           const clerkId = header.slice(7);
           if (![a, b].includes(clerkId)) throw new UnauthorizedException();
-          return Promise.resolve({ clerkId, plan: 'free' });
+          return Promise.resolve({ clerkId, plan: 'free', features: [] });
         },
         profile,
       })

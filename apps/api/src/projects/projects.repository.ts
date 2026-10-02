@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CreateProjectInput,
   ProjectListQuery,
   UpdateProjectInput,
+  PlanKey,
 } from '@marketos/shared';
+import type { Prisma } from '../generated/prisma/client';
+import { PLAN_LIMITS } from '../billing/plan-limits';
 import { PrismaService } from '../prisma/prisma.service';
 
 const select = {
@@ -39,8 +46,12 @@ export class ProjectsRepository {
       where: { id, ownerId, ...(includeDeleted ? {} : { deletedAt: null }) },
     });
   }
-  create(ownerId: string, data: CreateProjectInput) {
-    return this.prisma.project.create({ data: { ...data, ownerId }, select });
+  create(ownerId: string, data: CreateProjectInput, plan: PlanKey) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+      await this.checkLimit(tx, ownerId, plan);
+      return tx.project.create({ data: { ...data, ownerId }, select });
+    });
   }
   update(id: string, ownerId: string, data: UpdateProjectInput) {
     return this.prisma.project.update({
@@ -49,12 +60,31 @@ export class ProjectsRepository {
       data,
     });
   }
-  restore(id: string, ownerId: string) {
-    return this.prisma.project.update({
-      select,
-      where: { id, ownerId, deletedAt: { not: null } },
-      data: { deletedAt: null },
+  restore(id: string, ownerId: string, plan: PlanKey) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${ownerId} FOR UPDATE`;
+      const where = { id, ownerId, deletedAt: { not: null } };
+      if (!(await tx.project.findFirst({ where, select: { id: true } })))
+        throw new NotFoundException();
+      await this.checkLimit(tx, ownerId, plan);
+      return tx.project.update({ select, where, data: { deletedAt: null } });
     });
+  }
+  private async checkLimit(
+    tx: Prisma.TransactionClient,
+    ownerId: string,
+    plan: PlanKey,
+  ) {
+    const used = await tx.project.count({
+      where: { ownerId, deletedAt: null },
+    });
+    const limit = PLAN_LIMITS[plan].projects;
+    if (used >= limit)
+      throw new ForbiddenException({
+        code: 'PLAN_LIMIT',
+        message: 'Bạn đã đạt giới hạn dự án đang hoạt động.',
+        details: { limit, used, plan },
+      });
   }
   trash(id: string, ownerId: string) {
     return this.prisma.$transaction(async (tx) => {

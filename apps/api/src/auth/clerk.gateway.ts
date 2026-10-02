@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClerkClient } from '@clerk/backend';
-import type { PlanKey } from '@marketos/shared';
+import { FeatureKeySchema, type PlanKey } from '@marketos/shared';
 
 @Injectable()
 export class ClerkGateway {
@@ -38,10 +38,14 @@ export class ClerkGateway {
       auth.sessionClaims?.azp !== origin
     )
       throw new UnauthorizedException();
-    const plan: PlanKey = auth.has({ plan: 'pro' }) ? 'pro' : 'free';
+    // MarketOS bills individual users, not an active Clerk organization.
+    const plan: PlanKey = auth.has({ plan: 'u:pro' }) ? 'pro' : 'free';
     return {
       clerkId: auth.userId,
       plan,
+      features: FeatureKeySchema.options.filter((feature) =>
+        auth.has({ feature: `u:${feature}` }),
+      ),
     };
   }
 

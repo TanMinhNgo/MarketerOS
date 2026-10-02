@@ -7,11 +7,14 @@ import {
 import type { GenerateContentInput } from '@marketos/shared';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { textUsage } from './quota.service';
+import { QuotaService, readTextUsage, textUsage } from './quota.service';
 
 @Injectable()
 export class AiRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly quota: QuotaService,
+  ) {}
 
   brief(projectId: string, ownerId: string) {
     return this.prisma.brandBrief.findFirst({
@@ -27,8 +30,6 @@ export class AiRepository {
     briefSnapshot: Prisma.InputJsonValue,
     model: string,
     limit: number,
-    start: Date,
-    end: Date,
     requestedOutputs: 1 | 3 = 3,
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -37,6 +38,9 @@ export class AiRepository {
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${userId} AND "deletedAt" IS NULL FOR UPDATE`;
       if (!projects.length) throw new NotFoundException();
+      // Pick the period after waiting for locks; persist the same instant below.
+      const reservedAt = new Date();
+      const { start, end } = this.quota.period(reservedAt);
       if (
         await tx.generation.findUnique({
           where: { userId_requestId: { userId, requestId } },
@@ -61,22 +65,13 @@ export class AiRepository {
           errorCode: 'INTERRUPTED',
         },
       });
-      const where = {
+      const { units, regenerations, used } = await readTextUsage(
+        tx,
         userId,
-        kind: 'TEXT' as const,
-        createdAt: { gte: start, lt: end },
-      };
-      const usage = await tx.generation.aggregate({
-        where,
-        _sum: { quotaUnits: true },
-      });
-      // ponytail: TEXT/1 denotes regeneration; add a discriminator before other single-output TEXT flows.
-      const regenerations = await tx.generation.count({
-        where: { ...where, requestedOutputs: 1 },
-      });
+        start,
+        end,
+      );
       const quotaUnits = requestedOutputs === 1 ? 0 : 1;
-      const units = usage._sum.quotaUnits ?? 0;
-      const used = textUsage(units, regenerations);
       const nextUsed = textUsage(
         units + quotaUnits,
         regenerations + (requestedOutputs === 1 ? 1 : 0),
@@ -106,6 +101,7 @@ export class AiRepository {
           requestedOutputs,
           quotaUnits,
           status: 'PENDING',
+          createdAt: reservedAt,
         },
         select: { id: true },
       });

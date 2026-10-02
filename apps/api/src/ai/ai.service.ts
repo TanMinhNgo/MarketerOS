@@ -44,7 +44,6 @@ export class AiService {
       avoidWords: brief.avoidWords,
       samplePosts: brief.samplePosts,
     };
-    const { start, end } = this.quota.period();
     const generation = await this.repository.reserve(
       projectId,
       user.id,
@@ -52,9 +51,7 @@ export class AiService {
       { ...input, ...single },
       briefSnapshot,
       this.config.getOrThrow<string>('AI_MODEL'),
-      this.quota.limit(user.plan, 'TEXT'),
-      start,
-      end,
+      this.quota.limit(user.plan),
       single ? 1 : 3,
     );
     return {
