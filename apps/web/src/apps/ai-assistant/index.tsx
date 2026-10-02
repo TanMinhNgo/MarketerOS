@@ -9,14 +9,14 @@ import { useBrief, useProjects, useUsage } from "@/lib/queries";
 import { useActiveProject } from "@/stores/active-project";
 import { Chat } from "./chat";
 
-function Message({ children }: { children: React.ReactNode }) {
+function Message({ children }: Readonly<{ children: React.ReactNode }>) {
   return <div className="grid h-full place-items-center p-6 text-center text-sm">{children}</div>;
 }
 
-const Loading = () => <Message><span role="status" className="text-muted-foreground">Loading…</span></Message>;
+const Loading = () => <Message><output className="text-muted-foreground">Loading…</output></Message>;
 
 /** Assistant dùng Brand Brief làm ngữ cảnh: chưa có brief thì backend cũng từ chối. */
-function WithBrief({ projectId, name }: { projectId: string; name: string }) {
+function WithBrief({ projectId, name }: Readonly<{ projectId: string; name: string }>) {
   const open = useWindowStore((s) => s.open);
   const { data, isPending, error, refetch } = useBrief(projectId);
   if (isPending) return <Loading />;

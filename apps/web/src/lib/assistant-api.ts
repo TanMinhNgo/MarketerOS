@@ -18,8 +18,11 @@ import { postSse } from "./generate";
 const base = (projectId: string) => `/api/projects/${projectId}/assistant/messages`;
 
 /** Một trang lịch sử, mới nhất trước; `before` là id tin nhắn cuối của trang trước. */
-export const fetchMessages = (projectId: string, before?: string) =>
-  api(`${base(projectId)}?limit=30${before ? `&before=${encodeURIComponent(before)}` : ""}`, AssistantMessagesResponseSchema);
+export function fetchMessages(projectId: string, before?: string) {
+  const q = new URLSearchParams({ limit: "30" });
+  if (before) q.set("before", before);
+  return api(`${base(projectId)}?${q}`, AssistantMessagesResponseSchema);
+}
 
 /** Gửi một tin và stream câu trả lời; `onDelta` nhận đoạn chữ nối thêm, kết quả chính thức là sự kiện `done`. */
 export async function sendMessage(projectId: string, content: string, { signal, onDelta }: { signal?: AbortSignal; onDelta: (text: string) => void }): Promise<AssistantDone> {
@@ -42,12 +45,12 @@ export const clearMessages = (projectId: string) => request(base(projectId), { m
 export const markAction = (projectId: string, messageId: string, actionId: string, status: "applied" | "dismissed") =>
   api(`${base(projectId)}/${messageId}/actions/${actionId}`, AssistantMessageSchema, { method: "PATCH", body: { status } });
 
-const SERVER_FIELDS = ["id", "projectId", "createdAt", "updatedAt"];
+const SERVER_FIELDS = new Set(["id", "projectId", "createdAt", "updatedAt"]);
 const CONTENT_FIELDS = ["title", "body", "hashtags", "cta"] as const;
 
 /** Gộp thay đổi assistant đề xuất vào brief hiện tại thành body PUT đầy đủ (PUT thay toàn bộ trường). */
 export function mergeBrief(brief: BrandBriefResponse, changes: Extract<AssistantAction, { type: "update_brief" }>["changes"]): UpsertBrandBriefInput {
-  const fields = Object.fromEntries(Object.entries(brief).filter(([k]) => !SERVER_FIELDS.includes(k)));
+  const fields = Object.fromEntries(Object.entries(brief).filter(([k]) => !SERVER_FIELDS.has(k)));
   return UpsertBrandBriefSchema.parse({ ...fields, ...changes });
 }
 

@@ -56,7 +56,7 @@ suite(
         .send({ content: 'Đề xuất giúp tôi lên lịch bài viết.' });
     const done = (text: string) =>
       AssistantDoneSchema.parse(
-        JSON.parse(text.match(/event: done\ndata: ([^\n]+)/)![1]),
+        JSON.parse(/event: done\ndata: ([^\n]+)/.exec(text)![1]),
       );
     const reply = () => ({
       text: 'Đây là các đề xuất, chưa có hành động nào được thực thi.',
@@ -490,7 +490,7 @@ suite(
       };
       for (const body of [
         draft.body,
-        `Hook ngắn\n${Array(80).fill('Nội-dung').join(' ')}`,
+        `Hook ngắn\n${Array.from({ length: 80 }, () => 'Nội-dung').join(' ')}`,
       ]) {
         provider.mockImplementationOnce(() => {
           const output = {

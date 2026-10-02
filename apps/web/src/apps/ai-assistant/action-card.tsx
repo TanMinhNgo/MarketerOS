@@ -28,10 +28,11 @@ const BRIEF_LABEL: Record<string, string> = {
 const show = (key: string, v: unknown): string => {
   if (v === null || v === undefined || v === "") return "—";
   if (key === "language" && typeof v === "string" && v in LANGUAGES) return LANGUAGES[v as keyof typeof LANGUAGES].label;
-  return Array.isArray(v) ? (v.length ? v.join(", ") : "—") : String(v);
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  return typeof v === "object" ? JSON.stringify(v) : String(v);
 };
 
-function Diff({ label, before, after }: { label: string; before?: string; after: string }) {
+function Diff({ label, before, after }: Readonly<{ label: string; before?: string; after: string }>) {
   return (
     <div className="text-xs">
       <p className="font-semibold">{label}</p>
@@ -94,13 +95,13 @@ export function ActionCard({
   action,
   contents,
   brief,
-}: {
+}: Readonly<{
   projectId: string;
   messageId: string;
   action: AssistantAction;
   contents: ContentResponse[];
   brief: BrandBriefResponse | null | undefined;
-}) {
+}>) {
   const status = useActionStatus(projectId, messageId);
   const { icon: Icon, title, body, channel } = preview(action, contents, brief);
   const appliedAnyway = status.error instanceof AppliedButNotMarked;

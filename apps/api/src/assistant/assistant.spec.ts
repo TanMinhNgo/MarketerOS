@@ -13,6 +13,86 @@ import {
   parseAssistantOutput,
 } from './assistant-output';
 
+test.each([
+  ['provider failure', false, false, 'FAILED', 10, 5],
+  ['repair failure', true, false, 'FAILED', 20, 10],
+  ['repair cancellation', true, true, 'CANCELLED', 10, 5],
+] as const)(
+  '%s preserves generation status and token accounting',
+  async (_name, repair, cancel, status, tokensIn, tokensOut) => {
+    const abort = new AbortController();
+    const output = {
+      text: 'Đề xuất ban đầu.',
+      validationNote: 'Đề xuất chưa hợp lệ.',
+      actions: [
+        {
+          type: 'create_draft',
+          channel: 'FACEBOOK',
+          title: 'Tiêu đề',
+          body: 'Quá ngắn',
+          hashtags: [],
+          cta: null,
+        },
+      ],
+    };
+    let calls = 0;
+    const provider = jest.fn(() => {
+      const fails = !repair || ++calls === 2;
+      return {
+        partialOutputStream: (async function* () {
+          await Promise.resolve();
+          if (fails && cancel) abort.abort();
+          else if (fails) throw new Error('Provider failed');
+          yield { text: output.text };
+        })(),
+        output: Promise.resolve(output),
+        finishReason: Promise.resolve('stop'),
+        usage: Promise.resolve({ inputTokens: 10, outputTokens: 5 }),
+      };
+    });
+    const finish = jest.fn().mockResolvedValue(null);
+    const service = new AssistantService(
+      {
+        contents: jest.fn().mockResolvedValue([]),
+        finish,
+      } as unknown as AssistantRepository,
+      { assistant: provider } as unknown as OpenAiService,
+      new AssistantPrompt(),
+      new ConfigService(),
+    );
+    const prepared = {
+      projectId: 'p',
+      userId: 'u',
+      system: 'system',
+      prompt: 'prompt',
+      context: {
+        generationId: 'g',
+        project: {
+          brandBrief: { language: 'vi', avoidWords: [], businessAddress: null },
+        },
+      },
+    } as unknown as Awaited<ReturnType<AssistantService['prepare']>>;
+    const events = [];
+    for await (const event of service.stream(prepared, abort.signal))
+      events.push(event);
+    expect(provider).toHaveBeenCalledTimes(repair ? 2 : 1);
+    expect(finish).toHaveBeenCalledTimes(1);
+    expect(finish).toHaveBeenCalledWith(
+      'p',
+      'u',
+      'g',
+      status,
+      tokensIn,
+      tokensOut,
+      undefined,
+    );
+    expect(events.filter((event) => event.event === 'error')).toHaveLength(
+      cancel ? 0 : 1,
+    );
+    expect(events.some((event) => event.event === 'done')).toBe(false);
+  },
+);
+
 test('provider schema uses strict required objects and patches preserve omitted vs explicit null', () => {
   const schema = z.toJSONSchema(AssistantProviderOutputSchema, {
     target: 'draft-7',
@@ -256,7 +336,7 @@ test.each([
         {
           type: 'create_draft',
           channel,
-          title: 'Tiêu đề',
+          title: 'Tiêu đề <tag><tag>',
           body: draftBody,
           hashtags: ['ThẻMột', 'ThẻHai'],
           cta: 'Khám phá ngay',
@@ -336,6 +416,10 @@ test.each([
       expect(provider.mock.calls[1][1]).toContain(
         channel === 'FACEBOOK' ? 'dưới 80 từ' : 'quá 149 ký tự',
       );
+      expect(provider.mock.calls[1][1]).toContain(
+        String.raw`Tiêu đề \u003ctag>\u003ctag>`,
+      );
+      expect(provider.mock.calls[1][1]).not.toContain('<tag>');
       expect(finish).toHaveBeenCalledTimes(1);
       expect(finish.mock.calls[0].slice(2, 6)).toEqual([
         'g',

@@ -30,4 +30,10 @@ describe("Markdown", () => {
   it("dấu ** chưa đóng (đang stream) giữ nguyên chữ", () => {
     expect(html("Khoảng **19:00")).toContain("Khoảng **19:00");
   });
+
+  it("chuỗi dài nhiều dấu * vẫn chạy tuyến tính (không backtrack)", () => {
+    const start = performance.now();
+    html("**a".repeat(20_000));
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });

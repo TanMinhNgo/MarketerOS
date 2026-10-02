@@ -30,7 +30,11 @@ export function Providers({ children }: { children: ReactNode }) {
           },
         },
         // `meta.silent`: mutation tự hiện lỗi tại chỗ (vd. thẻ hành động của AI Assistant).
-        mutationCache: new MutationCache({ onError: (e, _v, _c, m) => void (m.meta?.silent || onMutationError(e)) }),
+        mutationCache: new MutationCache({
+          onError: (e, _v, _c, m) => {
+            if (!m.meta?.silent) onMutationError(e);
+          },
+        }),
         // Lỗi tải dữ liệu hiển thị tại chỗ trong từng app; chỉ báo toast khi đã có dữ liệu cũ mà làm mới thất bại.
         queryCache: new QueryCache({
           onError: (e, query) => {

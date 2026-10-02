@@ -165,7 +165,7 @@ export class AssistantRepository {
       };
     });
   }
-  async contents(projectId: string, userId: string, ids: string[]) {
+  contents(projectId: string, userId: string, ids: string[]) {
     return this.prisma.contentItem.findMany({
       where: {
         id: { in: ids },
@@ -196,6 +196,9 @@ export class AssistantRepository {
         select,
       });
       const finalStatus = project && userMessage ? status : 'CANCELLED';
+      let errorCode: string | null = null;
+      if (finalStatus === 'FAILED') errorCode = 'AI_ASSISTANT_FAILED';
+      else if (finalStatus === 'CANCELLED') errorCode = 'CANCELLED';
       const updated = await tx.generation.updateMany({
         where: {
           id: generationId,
@@ -209,12 +212,7 @@ export class AssistantRepository {
           completedAt: new Date(),
           tokensIn,
           tokensOut,
-          errorCode:
-            finalStatus === 'SUCCEEDED'
-              ? null
-              : finalStatus === 'FAILED'
-                ? 'AI_ASSISTANT_FAILED'
-                : 'CANCELLED',
+          errorCode,
         },
       });
       if (!updated.count && (tokensIn !== null || tokensOut !== null)) {

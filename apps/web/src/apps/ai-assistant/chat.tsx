@@ -18,7 +18,7 @@ import { useAssistant } from "./use-assistant";
 const SUGGESTIONS = ["Plan 5 posts for next week", "Which approved posts aren't scheduled yet?", "How could my Brand Brief be sharper?", "Rewrite my latest draft to be shorter"];
 
 /** `enter`: trượt lên khi vừa gửi (chỉ tin đang gửi, không áp cho lịch sử tải về). */
-function Bubble({ mine, bare, enter, delay = 0, children }: { mine: boolean; bare?: boolean; enter?: boolean; delay?: number; children: React.ReactNode }) {
+function Bubble({ mine, bare, enter, delay = 0, children }: Readonly<{ mine: boolean; bare?: boolean; enter?: boolean; delay?: number; children: React.ReactNode }>) {
   return (
     <div
       // Bong bóng AI rộng cố định (không giật khi stream); `bare` bỏ khung (lúc đang Thinking).
@@ -35,7 +35,7 @@ function Bubble({ mine, bare, enter, delay = 0, children }: { mine: boolean; bar
   );
 }
 
-export function Chat({ projectId, projectName, brief }: { projectId: string; projectName: string; brief: BrandBriefResponse }) {
+export function Chat({ projectId, projectName, brief }: Readonly<{ projectId: string; projectName: string; brief: BrandBriefResponse }>) {
   const open = useWindowStore((s) => s.open);
   const { history, messages, pending, error, send, stop, clear, isSending } = useAssistant(projectId);
   const contents = useContents(projectId).data?.items ?? [];
@@ -99,9 +99,9 @@ export function Chat({ projectId, projectName, brief }: { projectId: string; pro
           </Button>
         )}
         {history.isPending && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <output className="block text-sm text-muted-foreground">
             Loading conversation…
-          </p>
+          </output>
         )}
         {history.error && (
           <div className="text-sm">
@@ -161,7 +161,7 @@ export function Chat({ projectId, projectName, brief }: { projectId: string; pro
                     <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-primary align-middle" aria-hidden="true" />
                   </>
                 ) : (
-                  <p role="status" aria-label="Thinking" className="flex items-center gap-2">
+                  <output aria-label="Thinking" className="flex items-center gap-2">
                     <span className="flex gap-1" aria-hidden="true">
                       {["#7C5CFF", "#FF7AC6", "#2DD4BF"].map((c, i) => (
                         <span
@@ -177,7 +177,7 @@ export function Chat({ projectId, projectName, brief }: { projectId: string; pro
                     <span className="think-text font-medium" aria-hidden="true">
                       Thinking
                     </span>
-                  </p>
+                  </output>
                 )}
               </Bubble>
             </div>

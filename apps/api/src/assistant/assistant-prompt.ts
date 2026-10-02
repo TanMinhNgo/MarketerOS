@@ -4,7 +4,9 @@ import { channelPrompts } from '../ai/channel-prompts';
 import type { AssistantRepository } from './assistant.repository';
 
 const tag = (name: string, data: unknown, max: number) =>
-  `<${name}>${JSON.stringify(data).replace(/</g, '\\u003c').slice(0, max)}</${name}>`;
+  `<${name}>${JSON.stringify(data)
+    .replaceAll('<', String.raw`\u003c`)
+    .slice(0, max)}</${name}>`;
 
 @Injectable()
 export class AssistantPrompt {
