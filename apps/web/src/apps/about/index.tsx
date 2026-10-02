@@ -11,12 +11,12 @@ const SHIPPED = [
   "Brand Brief per project",
   "Content Studio: AI writes 3 post variants per request, in the brief's voice and language",
   "Review and approve drafts, then schedule them on the Content Calendar",
+  "Free and Pro plans with usage limits, checkout and billing history",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
 ];
 
 const NEXT = [
-  { name: "Plans & Billing", note: "Free and Pro plans with usage limits." },
   { name: "Media Library, Integrations, Reports", note: "Assets, social channels and performance." },
 ];
 

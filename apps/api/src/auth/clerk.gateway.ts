@@ -38,12 +38,13 @@ export class ClerkGateway {
       auth.sessionClaims?.azp !== origin
     )
       throw new UnauthorizedException();
-    const plan: PlanKey = auth.has({ plan: 'pro' }) ? 'pro' : 'free';
+    // MarketOS bills individual users, not an active Clerk organization.
+    const plan: PlanKey = auth.has({ plan: 'u:pro' }) ? 'pro' : 'free';
     return {
       clerkId: auth.userId,
       plan,
       features: FeatureKeySchema.options.filter((feature) =>
-        auth.has({ feature }),
+        auth.has({ feature: `u:${feature}` }),
       ),
     };
   }

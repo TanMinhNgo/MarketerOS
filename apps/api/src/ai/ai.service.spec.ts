@@ -102,8 +102,6 @@ test('streams partial variants then persists measured usage and completion', asy
     expect.anything(),
     'test-model',
     10,
-    expect.any(Date),
-    expect.any(Date),
     3,
   );
   expect(repository.finish).toHaveBeenCalledWith(
@@ -232,8 +230,6 @@ test('single regeneration repairs wrong cardinality once and records one complet
     expect.objectContaining({ language: 'vi' }),
     'test-model',
     10,
-    expect.any(Date),
-    expect.any(Date),
     1,
   );
   expect(openai.stream).toHaveBeenCalledTimes(2);

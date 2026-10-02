@@ -120,7 +120,7 @@ function CurrentPlan() {
 
       {isPaid && !endsAt && next && <Muted>Next payment of {next.amount.amountFormatted} on {fmt(next.date)}.</Muted>}
       {isPaid && endsAt && <Muted>You keep {planName} features until {fmt(endsAt)}; you won&apos;t be charged again.</Muted>}
-      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade for more projects, a stronger AI model and channel publishing.</Muted>}
+      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade for 20 projects and 200 AI generations a month.</Muted>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(!isPaid || endsAt) && pro && (

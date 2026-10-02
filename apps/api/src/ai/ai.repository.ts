@@ -7,11 +7,14 @@ import {
 import type { GenerateContentInput } from '@marketos/shared';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { readTextUsage, textUsage } from './quota.service';
+import { QuotaService, readTextUsage, textUsage } from './quota.service';
 
 @Injectable()
 export class AiRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly quota: QuotaService,
+  ) {}
 
   brief(projectId: string, ownerId: string) {
     return this.prisma.brandBrief.findFirst({
@@ -27,8 +30,6 @@ export class AiRepository {
     briefSnapshot: Prisma.InputJsonValue,
     model: string,
     limit: number,
-    start: Date,
-    end: Date,
     requestedOutputs: 1 | 3 = 3,
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -37,6 +38,9 @@ export class AiRepository {
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${userId} AND "deletedAt" IS NULL FOR UPDATE`;
       if (!projects.length) throw new NotFoundException();
+      // Pick the period after waiting for locks; persist the same instant below.
+      const reservedAt = new Date();
+      const { start, end } = this.quota.period(reservedAt);
       if (
         await tx.generation.findUnique({
           where: { userId_requestId: { userId, requestId } },
@@ -97,6 +101,7 @@ export class AiRepository {
           requestedOutputs,
           quotaUnits,
           status: 'PENDING',
+          createdAt: reservedAt,
         },
         select: { id: true },
       });

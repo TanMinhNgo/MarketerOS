@@ -274,7 +274,8 @@ khóa dự án cũ; chỉ chặn tạo/restore thêm khi đã đạt hoặc vư�
 
 Shared `BillingUsageResponseSchema` / `BillingUsageResponse`,
 `PlanLimitDetailsSchema` / `PlanLimitDetails`. Plan và features lấy từ token đã
-verify qua Clerk `has`, không lấy quyền từ PLAN_CATALOG hay DB. Features có thể
+verify qua Clerk `has` với scope `u:` (User plans), không lấy quyền từ tổ chức,
+PLAN_CATALOG hay DB. Features có thể
 rỗng, kể cả Pro; entitlement không đồng nghĩa tính năng đã triển khai.
 Usage đọc snapshot RepeatableRead; `used` không bị cắt về limit khi hạ gói.
 

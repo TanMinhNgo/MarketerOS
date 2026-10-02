@@ -18,7 +18,7 @@ const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Statu
   image_generation: { label: "AI image generation", blurb: "Create visuals that follow the style you describe in your brief.", status: "soon" },
   personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and reference material.", status: "soon" },
   content_calendar: { label: "Content calendar", blurb: "Approve drafts, then plan and schedule them on a calendar.", status: "now" },
-  more_projects: { label: "More projects", blurb: "Run more brands or clients side by side.", status: "soon" },
+  more_projects: { label: "More projects", blurb: "Run up to 20 brands or clients side by side (Free: 3).", status: "now" },
   strong_model: { label: "Advanced AI models", blurb: "A stronger model for longer, more nuanced writing.", status: "soon" },
   expanded_references: { label: "Expanded reference storage", blurb: "Keep more brand material close to the AI.", status: "soon" },
   channel_publishing: { label: "Channels and scheduled publishing", blurb: "Connect social channels and publish on schedule.", status: "soon" },
@@ -217,11 +217,13 @@ export default function App() {
       </Section>
 
       <Section id="pricing-limits" title="About limits" intro="We would rather be clear than clever.">
-        <p className="text-sm leading-relaxed">
-          Usage limits such as projects, generations per day and storage are still being finalized, because they depend on what the AI costs to run. The plan direction is already set: Free is for getting started,
-          Pro raises the ceiling and unlocks the tools above. Exact numbers will be published on this page before any limit is enforced.
+        <ul className="space-y-1 text-sm leading-relaxed">
+          <li><strong>Free:</strong> 3 active projects and 10 AI generations a month.</li>
+          <li><strong>Pro:</strong> 20 active projects and 200 AI generations a month.</li>
+        </ul>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Every generation writes 3 variants on both plans. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. Limits for images and storage will be published here before those features launch.
         </p>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Planned: up to 3 content variants per generation on Free and up to 5 on Pro.</p>
       </Section>
 
       <Section id="pricing-faq" title="Questions, answered">

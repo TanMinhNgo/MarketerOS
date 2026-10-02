@@ -507,8 +507,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
         { product: 'Test' },
         'test-model',
         10,
-        start,
-        end,
       );
     const response = await request(app.getHttpServer())
       .post(`/api/projects/${projectId}/generate`)
@@ -557,13 +555,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
     const project = await prisma.project.create({
       data: { ownerId: owner.id, name: 'Quota' },
     });
-    const now = new Date();
-    const start = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-    );
-    const end = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
-    );
     const reserve = (requestId: string) =>
       ai.reserve(
         project.id,
@@ -573,8 +564,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
         { product: 'Test' },
         'test-model',
         1,
-        start,
-        end,
       );
     const results = await Promise.allSettled([
       reserve(randomUUID()),
@@ -600,8 +589,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
         { product: 'Test' },
         'test-model',
         2,
-        start,
-        end,
         1,
       );
     const singles = await Promise.allSettled(
@@ -630,8 +617,6 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       { product: 'Test' },
       'test-model',
       2,
-      start,
-      end,
     );
     await expect(extraRegular).rejects.toMatchObject({ status: 429 });
   });
