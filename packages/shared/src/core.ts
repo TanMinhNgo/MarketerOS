@@ -53,29 +53,35 @@ export const ContentLanguageSchema = z.enum([
   'es',
   'de',
 ]);
-export const UpsertBrandBriefSchema = z
+export const UpsertBrandBriefFieldsSchema = z
   .object({
     product: text(5000),
     audience: text(3000),
     tone: text(500),
-    language: ContentLanguageSchema.default('vi'),
+    language: ContentLanguageSchema,
     businessAddress: z
       .string()
       .trim()
       .max(300)
       .nullable()
-      .default(null)
       .transform((value) => value || null),
-    keyMessages: z.array(text(500)).max(20).default([]),
-    avoidWords: z.array(text(100)).max(100).default([]),
-    samplePosts: z.array(text(5000)).max(10).default([]),
-    brandColors: z
-      .array(z.string().regex(/^#[0-9a-fA-F]{6}$/))
-      .max(10)
-      .default([]),
-    visualStyle: text(2000).nullable().default(null),
+    keyMessages: z.array(text(500)).max(20),
+    avoidWords: z.array(text(100)).max(100),
+    samplePosts: z.array(text(5000)).max(10),
+    brandColors: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).max(10),
+    visualStyle: text(2000).nullable(),
   })
   .strict();
+export const UpsertBrandBriefSchema = UpsertBrandBriefFieldsSchema.extend({
+  language: UpsertBrandBriefFieldsSchema.shape.language.default('vi'),
+  businessAddress:
+    UpsertBrandBriefFieldsSchema.shape.businessAddress.default(null),
+  keyMessages: UpsertBrandBriefFieldsSchema.shape.keyMessages.default([]),
+  avoidWords: UpsertBrandBriefFieldsSchema.shape.avoidWords.default([]),
+  samplePosts: UpsertBrandBriefFieldsSchema.shape.samplePosts.default([]),
+  brandColors: UpsertBrandBriefFieldsSchema.shape.brandColors.default([]),
+  visualStyle: UpsertBrandBriefFieldsSchema.shape.visualStyle.default(null),
+});
 export const BrandBriefResponseSchema = UpsertBrandBriefSchema.extend({
   id: z.string(),
   projectId: z.string(),
