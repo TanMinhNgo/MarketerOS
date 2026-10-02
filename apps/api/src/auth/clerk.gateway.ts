@@ -5,7 +5,35 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClerkClient } from '@clerk/backend';
-import { FeatureKeySchema, type PlanKey } from '@marketos/shared';
+import {
+  FeatureKeySchema,
+  type FeatureKey,
+  type PlanKey,
+} from '@marketos/shared';
+
+// Public API keys are stable; these slugs match the instance's verified Clerk catalog.
+const CLERK_FEATURE_SLUGS: Record<FeatureKey, readonly string[]> = {
+  content_generation: [
+    'basic_ai_content_generation_allowance',
+    'higher_ai_content_and_image_generation_allowances',
+  ],
+  image_generation: [
+    'trial_ai_image_generation_allowance',
+    'higher_ai_content_and_image_generation_allowances',
+  ],
+  brand_brief: ['brand_brief_for_each_project', 'everything_in_free'],
+  personalization: [
+    'personal_preferences_and_references',
+    'everything_in_free',
+  ],
+  content_calendar: ['content_drafts_and_calendar', 'everything_in_free'],
+  more_projects: ['increased_project_limit'],
+  strong_model: ['access_to_advanced_ai_models'],
+  expanded_references: ['expanded_reference_and_media_storage'],
+  channel_publishing: ['channel_connections_and_scheduled_publishing'],
+  ai_assistant: ['project_aware_ai_assistant'],
+  content_analytics: ['content_performance_analytics'],
+};
 
 @Injectable()
 export class ClerkGateway {
@@ -44,7 +72,9 @@ export class ClerkGateway {
       clerkId: auth.userId,
       plan,
       features: FeatureKeySchema.options.filter((feature) =>
-        auth.has({ feature: `u:${feature}` }),
+        CLERK_FEATURE_SLUGS[feature].some((slug) =>
+          auth.has({ feature: `u:${slug}` }),
+        ),
       ),
     };
   }
