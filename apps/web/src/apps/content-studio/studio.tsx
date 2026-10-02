@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { selectFocusedId, useWindowStore } from "@/desktop/window-store";
 import { errorMessage } from "@/lib/api-client";
 import { LANGUAGES } from "@/lib/languages";
-import { useSaveContent } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { keys, useSaveContent, useUsage } from "@/lib/queries";
 import { CHANNELS, type ChannelValue } from "./channels";
 import { DraftsPanel } from "./drafts-panel";
 import { isQuotaError, useGeneration } from "./use-generation";
@@ -21,10 +22,12 @@ import { VariantCard } from "./variant-card";
 function GenerationError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const open = useWindowStore((s) => s.open);
   const quota = isQuotaError(error);
+  const usage = useUsage(quota).data;
+  const resets = usage ? ` They reset on ${new Date(usage.period.end).toLocaleDateString("en-US", { month: "long", day: "numeric" })}.` : "";
   return (
     <div role="alert" className="rounded-xl border-2 border-destructive/40 bg-destructive/10 p-4 text-sm">
       <p className="font-semibold">{quota ? "You've reached your generation limit" : "We couldn't generate content"}</p>
-      <p className="mt-1">{quota ? "Your plan's AI generations are used up for now. Upgrade for more, or try again later." : errorMessage(error)}</p>
+      <p className="mt-1">{quota ? `You've used all ${usage ? usage.usage.text.limit : "your"} AI generations for this month.${resets} Upgrade to Pro for more.` : errorMessage(error)}</p>
       <div className="mt-3 flex gap-2">
         {quota ? <Button size="sm" onClick={() => open("pricing")}>See plans</Button> : <Button size="sm" variant="outline" onClick={onRetry}>Try again</Button>}
       </div>
@@ -43,11 +46,14 @@ export function Studio({ projectId, projectName, language }: { projectId: string
   const save = useSaveContent(projectId);
   const watching = useWindowStore((s) => selectFocusedId(s) === "content-studio");
   const notified = useRef(0);
+  const qc = useQueryClient();
+  const refreshUsage = () => void qc.invalidateQueries({ queryKey: keys.usage });
 
   // Báo khi tạo xong hoặc lỗi lúc người dùng không nhìn cửa sổ này (thu nhỏ, cửa sổ khác ở trên, tab ẩn).
   useEffect(() => {
     if ((state.status !== "done" && state.status !== "error") || notified.current === state.run) return;
     notified.current = state.run;
+    void qc.invalidateQueries({ queryKey: keys.usage });
     const away = !watching || document.hidden;
     const action = { label: "Open Content Studio", appId: "content-studio" };
     if (state.status === "done") {
@@ -57,7 +63,7 @@ export function Studio({ projectId, projectName, language }: { projectId: string
     } else {
       notify.error("Content generation failed", { description: errorMessage(state.error), action, persist: true, os: true, silent: !away });
     }
-  }, [state.status, state.run, state.error, watching, projectName]);
+  }, [state.status, state.run, state.error, watching, projectName, qc]);
 
   const run = () => {
     const parsed = GenerateContentInputSchema.safeParse({ channel, goal, topic, ...(notes.trim() ? { notes } : {}) });
@@ -67,7 +73,9 @@ export function Studio({ projectId, projectName, language }: { projectId: string
   };
 
   const regenerateVariant = (index: number) =>
-    regenerate(index).catch((e: unknown) =>
+    regenerate(index)
+      .finally(refreshUsage)
+      .catch((e: unknown) =>
       isQuotaError(e)
         ? notify.warning("Generation limit reached", { description: "The previous version was kept. Upgrade or try again later.", action: { label: "See plans", appId: "pricing" } })
         : notify.error("Couldn't regenerate this variant", { description: `The previous version was kept. ${errorMessage(e)}` }),

@@ -1,4 +1,5 @@
 import {
+  BillingUsageResponseSchema,
   BrandBriefResponseSchema,
   ContentListResponseSchema,
   ContentResponseSchema,
@@ -25,6 +26,7 @@ export const keys = {
   trash: ["projects", "trash"] as const,
   brief: (projectId: string) => ["brief", projectId] as const,
   contents: (projectId: string) => ["contents", projectId] as const,
+  usage: ["billing", "usage"] as const,
 };
 
 const LIST = "?page=1&limit=100";
@@ -33,12 +35,15 @@ export const useMe = (enabled = true) => useQuery({ queryKey: keys.me, queryFn: 
 
 export const useProjects = (enabled = true) => useQuery({ queryKey: keys.projects, queryFn: () => api(`/api/projects${LIST}`, ProjectListResponseSchema), enabled });
 
+/** Gói, quyền đã xác minh và số đã dùng / giới hạn trong kỳ (tháng UTC). Backend vẫn là nơi quyết định chặn. */
+export const useUsage = (enabled = true) => useQuery({ queryKey: keys.usage, queryFn: () => api("/api/billing/usage", BillingUsageResponseSchema), enabled });
+
 export const useTrash = () => useQuery({ queryKey: keys.trash, queryFn: () => api(`/api/projects/trash${LIST}`, ProjectListResponseSchema) });
 
-/** Làm mới cả danh sách lẫn Trash vì một thao tác chuyển dự án qua lại giữa hai nơi. */
+/** Làm mới cả danh sách lẫn Trash (dự án chuyển qua lại giữa hai nơi) và số dự án đã dùng. */
 function useInvalidateProjects() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: keys.projects });
+  return () => Promise.all([qc.invalidateQueries({ queryKey: keys.projects }), qc.invalidateQueries({ queryKey: keys.usage })]);
 }
 
 export function useCreateProject() {

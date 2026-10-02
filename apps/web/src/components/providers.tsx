@@ -1,10 +1,22 @@
 "use client";
 
+import { PlanLimitDetailsSchema } from "@marketos/shared";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { ApiError, errorMessage } from "@/lib/api-client";
 import { notify } from "@/lib/notify/notify";
+
+/** Chạm giới hạn gói (403 PLAN_LIMIT, hiện chỉ có số dự án): báo rõ và mở được trang gói. */
+function onMutationError(e: unknown) {
+  const details = e instanceof ApiError && e.code === "PLAN_LIMIT" ? PlanLimitDetailsSchema.safeParse(e.details) : null;
+  if (!details?.success) return notify.error(errorMessage(e));
+  const { plan, limit } = details.data;
+  notify.warning("Project limit reached", {
+    description: plan === "free" ? `The Free plan includes ${limit} active projects. Upgrade to Pro for more, or move a project to Trash.` : `Your plan includes ${limit} active projects. Move a project to Trash to make room.`,
+    action: { label: "See plans", appId: "plans-billing" },
+  });
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -17,7 +29,7 @@ export function Providers({ children }: { children: ReactNode }) {
             retry: (count, e) => !(e instanceof ApiError && e.status >= 400 && e.status < 500) && count < 2,
           },
         },
-        mutationCache: new MutationCache({ onError: (e) => notify.error(errorMessage(e)) }),
+        mutationCache: new MutationCache({ onError: onMutationError }),
         // Lỗi tải dữ liệu hiển thị tại chỗ trong từng app; chỉ báo toast khi đã có dữ liệu cũ mà làm mới thất bại.
         queryCache: new QueryCache({
           onError: (e, query) => {

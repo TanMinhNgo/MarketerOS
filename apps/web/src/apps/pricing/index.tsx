@@ -43,7 +43,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   { q: "Do you store my card details?", a: "No. Card details are handled by Stripe through Clerk's billing, so MarketOS never sees them." },
   { q: "Where can I see my payments?", a: "In Plans & Billing, under Billing history, with the date, amount and status of every charge." },
   { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation and the Content Calendar are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
-  { q: "What are the usage limits?", a: "Limits such as the number of projects, daily generations and storage are still being finalized. We will publish exact numbers here before they take effect rather than guessing now." },
+  { q: "What are the usage limits?", a: "Free: 3 active projects and 10 AI generations a month. Pro: 20 active projects and 200 AI generations a month. One generation writes 3 variants, and every 3 single-variant regenerates count as 1. Generations reset on the 1st of each month (UTC); projects in Trash don't count. You can see your usage in Plans & Billing." },
   { q: "Is there a team or student plan?", a: "Not yet. There are two plans for now: Free and Pro." },
 ];
 

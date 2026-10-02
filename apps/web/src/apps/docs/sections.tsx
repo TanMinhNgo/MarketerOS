@@ -270,6 +270,7 @@ export const SECTIONS: DocSection[] = [
           rows={[
             ["Upgrade", "Open Plans & Billing and press Upgrade to Pro. A secure checkout opens."],
             ["See my next payment", "Your plan card shows the next payment amount and date."],
+            ["See my usage", "The Usage card shows active projects and AI generations used this month, and when generations reset. Free: 3 projects, 10 generations. Pro: 20 projects, 200 generations."],
             ["Cancel", "Press Cancel plan and confirm. You keep Pro until the end of the period you paid for."],
             ["Check my payments", "Billing history lists every charge with its date, amount and status."],
             ["Update my card", "Press Manage payment methods to open your Account."],

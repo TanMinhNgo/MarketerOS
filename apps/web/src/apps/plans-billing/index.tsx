@@ -1,14 +1,18 @@
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import { CheckoutButton, usePaymentAttempts, usePaymentMethods, usePlans, useSubscription } from "@clerk/nextjs/experimental";
-import { CreditCard, Receipt, Sparkles } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ChartNoAxesColumn, CreditCard, Receipt, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { notify } from "@/lib/notify/notify";
 import { AuthGate } from "@/components/auth-gate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWindowStore } from "@/desktop/window-store";
-import { useMe } from "@/lib/queries";
+import { Progress } from "@/components/ui/progress";
+import { errorMessage } from "@/lib/api-client";
+import { keys, useMe, useUsage } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
@@ -30,9 +34,41 @@ function Card({ icon: Icon, title, children, action }: { icon: typeof Sparkles; 
 
 const Muted = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-muted-foreground">{children}</p>;
 
+function Meter({ label, used, limit, hint }: { label: string; used: number; limit: number; hint: string }) {
+  const full = used >= limit;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium">{label}</span>
+        <span className={cn("tabular-nums", full ? "font-semibold text-destructive" : "text-muted-foreground")}>
+          {used} / {limit}
+        </span>
+      </div>
+      <Progress value={Math.min(100, (used / limit) * 100)} aria-label={`${label}: ${used} of ${limit} used`} className={cn(full && "[&>[data-slot=progress-indicator]]:bg-destructive")} />
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+/** Số đã dùng / giới hạn của gói trong kỳ, do backend đo (không tự tính ở client). */
+function Usage() {
+  const { data, isPending, error } = useUsage();
+  if (isPending) return <Muted>Loading usage…</Muted>;
+  if (error) return <Muted>{errorMessage(error)}</Muted>;
+  const { projects, text } = data.usage;
+  return (
+    <div className="space-y-4">
+      <Meter label="Active projects" used={projects.used} limit={projects.limit} hint="Projects in Trash don't count." />
+      <Meter label="AI generations this month" used={text.used} limit={text.limit} hint={`One generation writes 3 variants; every 3 single-variant regenerates count as 1. Resets ${fmt(new Date(data.period.end))}.`} />
+    </div>
+  );
+}
+
 function CurrentPlan() {
   const open = useWindowStore((s) => s.open);
   const me = useMe();
+  const qc = useQueryClient();
+  const { getToken } = useAuth();
   const sub = useSubscription({ for: "user" });
   const plans = usePlans({ for: "user" });
   const [confirming, setConfirming] = useState(false);
@@ -45,6 +81,12 @@ function CurrentPlan() {
   const isPaid = !!item && !item.plan.isDefault;
   const endsAt = item?.canceledAt ? item.periodEnd : null;
   const next = sub.data?.nextPayment ?? item?.nextPayment;
+
+  // Gói nằm trong token Clerk: lấy token mới rồi mới tải lại gói/giới hạn từ backend.
+  const afterCheckout = async () => {
+    await getToken({ skipCache: true }).catch(() => null);
+    await Promise.all([sub.revalidate(), qc.invalidateQueries({ queryKey: keys.me }), qc.invalidateQueries({ queryKey: keys.usage })]);
+  };
 
   const cancel = async () => {
     if (!item) return;
@@ -82,7 +124,7 @@ function CurrentPlan() {
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(!isPaid || endsAt) && pro && (
-          <CheckoutButton planId={pro.id} planPeriod="month" for="user" onSubscriptionComplete={() => void sub.revalidate()}>
+          <CheckoutButton planId={pro.id} planPeriod="month" for="user" onSubscriptionComplete={() => void afterCheckout()}>
             <Button>
               <Sparkles /> {endsAt ? "Resubscribe to Pro" : "Upgrade to Pro"}
             </Button>
@@ -212,6 +254,9 @@ function BillingApp() {
       </header>
       <Card icon={Sparkles} title="Your plan">
         <CurrentPlan />
+      </Card>
+      <Card icon={ChartNoAxesColumn} title="Usage">
+        <Usage />
       </Card>
       <Card icon={CreditCard} title="Payment method">
         <PaymentMethods />
