@@ -2,6 +2,25 @@ import type { GenerateContentInput, GeneratedVariant } from '@marketos/shared';
 import { validateVariants } from './variant-validator';
 
 type Channel = GenerateContentInput['channel'];
+
+test.each([
+  ['zh', '今天学习'],
+  ['ja', '今日は学ぶ'],
+  ['th', 'เรียนวันนี้'],
+] as const)('counts %s words without requiring spaces', (language, phrase) => {
+  const item = {
+    title: phrase,
+    body: `${phrase}\n${phrase.repeat(40)}`,
+    hashtags: ['BrandOne', 'BrandTwo'],
+    cta: '',
+  };
+  expect(
+    validateVariants([item, item, item], 'FACEBOOK', [], null, language),
+  ).toEqual([]);
+  expect(
+    validateVariants([item, item, item], 'FACEBOOK', [], null, 'vi').join(' '),
+  ).toContain('dưới 80 từ');
+});
 const repeat = (count: number) => Array(count).fill('nội-dung').join(' ');
 const variant = (body: string, hashtags: string[] = []) => ({
   title: 'Tiêu đề',

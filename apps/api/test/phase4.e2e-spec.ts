@@ -15,6 +15,9 @@ import { configureApp } from '../src/common/configure-app';
 import {
   ContentListResponseSchema,
   ContentResponseSchema,
+  SingleVariantDoneSchema,
+  VariantDeltaSchema,
+  VariantDoneSchema,
 } from '@marketos/shared';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -48,13 +51,20 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       })
       .overrideProvider(OpenAiService)
       .useValue({
-        stream: () => ({
+        stream: (
+          _system: string,
+          _prompt: string,
+          _signal: AbortSignal,
+          requestedOutputs = 3,
+        ) => ({
           partialOutputStream: (async function* () {
             yield { variants: [{ title: 'Học' }] };
             await delay(60);
-            yield output;
+            yield { variants: output.variants.slice(0, requestedOutputs) };
           })(),
-          output: Promise.resolve(output),
+          output: Promise.resolve({
+            variants: output.variants.slice(0, requestedOutputs),
+          }),
           finishReason: Promise.resolve('stop'),
           usage: Promise.resolve({ inputTokens: 12, outputTokens: 34 }),
         }),
@@ -208,6 +218,124 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       .get(`${path}/${content.id}`)
       .set(auth(a))
       .expect(404);
+  });
+
+  it('validates regeneration input/auth and streams only the requested index with one quota unit', async () => {
+    const path = `/api/projects/${projectId}/generate/variant`;
+    const body = {
+      input: { channel: 'FACEBOOK', goal: 'Giới thiệu', topic: 'Khóa học' },
+      others: [variant],
+      index: 2,
+    };
+    await request(app.getHttpServer()).post(path).send(body).expect(401);
+    await request(app.getHttpServer())
+      .post(path)
+      .set(auth(b))
+      .set('Idempotency-Key', randomUUID())
+      .send(body)
+      .expect(404);
+    for (const invalid of [
+      { ...body, index: 3 },
+      { ...body, others: [variant, variant, variant] },
+      { ...body, extra: true },
+      { ...body, input: { ...body.input, userId: b } },
+    ]) {
+      const res = await request(app.getHttpServer())
+        .post(path)
+        .set(auth(a))
+        .set('Idempotency-Key', randomUUID())
+        .send(invalid)
+        .expect(400);
+      expect((res.body as { code: string }).code).toBe('VALIDATION');
+    }
+    for (const key of [undefined, 'not-a-uuid']) {
+      const req = request(app.getHttpServer()).post(path).set(auth(a));
+      if (key) req.set('Idempotency-Key', key);
+      const res = await req.send(body).expect(400);
+      expect((res.body as { code: string }).code).toBe('VALIDATION');
+    }
+    const requestId = randomUUID();
+    const res = await request(app.getHttpServer())
+      .post(path)
+      .set(auth(a))
+      .set('Idempotency-Key', requestId)
+      .send(body)
+      .expect(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    const events = [
+      ...res.text.matchAll(/event: ([^\n]+)\ndata: ([^\n]+)/g),
+    ].map((match) => ({
+      event: match[1],
+      data: JSON.parse(match[2]) as unknown,
+    }));
+    const deltas = events
+      .filter((event) => event.event === 'variant.delta')
+      .map((event) => VariantDeltaSchema.parse(event.data));
+    const complete = events
+      .filter((event) => event.event === 'variant.done')
+      .map((event) => VariantDoneSchema.parse(event.data));
+    expect(deltas.length).toBeGreaterThan(0);
+    expect(deltas.every((event) => event.index === 2)).toBe(true);
+    expect(complete).toHaveLength(1);
+    expect(complete[0].index).toBe(2);
+    expect(events.at(-1)?.event).toBe('done');
+    const done = SingleVariantDoneSchema.parse(events.at(-1)?.data);
+    const generation = await prisma.generation.findUniqueOrThrow({
+      where: { id: done.generationId },
+    });
+    expect(generation).toMatchObject({
+      kind: 'TEXT',
+      requestedOutputs: 1,
+      completedOutputs: 1,
+      quotaUnits: 1,
+      status: 'SUCCEEDED',
+      tokensIn: 12,
+      tokensOut: 34,
+    });
+    await request(app.getHttpServer())
+      .post(path)
+      .set(auth(a))
+      .set('Idempotency-Key', requestId)
+      .send(body)
+      .expect(409);
+    // Idempotency namespace is shared with the three-variant endpoint.
+    await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/generate`)
+      .set(auth(a))
+      .set('Idempotency-Key', requestId)
+      .send(body.input)
+      .expect(409);
+    await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/contents`)
+      .set(auth(a))
+      .send({
+        channel: 'FACEBOOK',
+        ...variant,
+        generationId: done.generationId,
+      })
+      .expect(201);
+    const spec = await request(app.getHttpServer())
+      .get('/docs-json')
+      .expect(200);
+    const operation = (
+      spec.body as {
+        paths: Record<
+          string,
+          {
+            post: {
+              parameters: { name: string }[];
+              requestBody: unknown;
+              security: unknown;
+            };
+          }
+        >;
+      }
+    ).paths['/api/projects/{projectId}/generate/variant'].post;
+    expect(
+      operation.parameters.some((param) => param.name === 'Idempotency-Key'),
+    ).toBe(true);
+    expect(operation.requestBody).toBeTruthy();
+    expect(operation.security).toBeTruthy();
   });
 
   it('requires approval before scheduling and re-approval after editing', async () => {
@@ -365,7 +493,14 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
     const end = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
     );
-    for (let i = 0; i < 9; i++)
+    const used = await prisma.generation.count({
+      where: {
+        userId: owner.id,
+        kind: 'TEXT',
+        createdAt: { gte: start, lt: end },
+      },
+    });
+    for (let i = used; i < 10; i++)
       await ai.reserve(
         projectId,
         owner.id,
@@ -384,6 +519,17 @@ suite('Phase 4 AI and draft content with PostgreSQL', () => {
       .send({ channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' })
       .expect(429);
     expect((response.body as { code: string }).code).toBe('QUOTA_EXCEEDED');
+    const single = await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/generate/variant`)
+      .set(auth(a))
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        input: { channel: 'FACEBOOK', goal: 'Test', topic: 'Quota' },
+        others: [],
+        index: 0,
+      })
+      .expect(429);
+    expect((single.body as { code: string }).code).toBe('QUOTA_EXCEEDED');
   });
 
   it('serializes quota reservations for concurrent requests by the same user', async () => {

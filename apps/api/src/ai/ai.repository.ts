@@ -28,6 +28,7 @@ export class AiRepository {
     limit: number,
     start: Date,
     end: Date,
+    requestedOutputs: 1 | 3 = 3,
   ) {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
@@ -85,7 +86,7 @@ export class AiRepository {
           briefSnapshot,
           model,
           kind: 'TEXT',
-          requestedOutputs: 3,
+          requestedOutputs,
           quotaUnits: 1,
           status: 'PENDING',
         },
@@ -100,12 +101,13 @@ export class AiRepository {
     tokensIn: number | null,
     tokensOut: number | null,
     errorCode: string | null,
+    completedOutputs: 1 | 3 = 3,
   ) {
     return this.prisma.generation.updateMany({
       where: { id, status: 'PENDING' },
       data: {
         status,
-        completedOutputs: status === 'SUCCEEDED' ? 3 : 0,
+        completedOutputs: status === 'SUCCEEDED' ? completedOutputs : 0,
         completedAt: new Date(),
         tokensIn,
         tokensOut,

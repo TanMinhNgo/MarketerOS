@@ -39,7 +39,7 @@ export function Studio({ projectId, projectName, language }: { projectId: string
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const { state, generate, stop, isStreaming } = useGeneration(projectId);
+  const { state, generate, regenerate, stop, isStreaming } = useGeneration(projectId);
   const save = useSaveContent(projectId);
   const watching = useWindowStore((s) => selectFocusedId(s) === "content-studio");
   const notified = useRef(0);
@@ -66,9 +66,17 @@ export function Studio({ projectId, projectName, language }: { projectId: string
     void generate(parsed.data);
   };
 
-  const saveVariant = async (v: GeneratedVariant) => {
+  const regenerateVariant = (index: number) =>
+    regenerate(index).catch((e: unknown) =>
+      isQuotaError(e)
+        ? notify.warning("Generation limit reached", { description: "The previous version was kept. Upgrade or try again later.", action: { label: "See plans", appId: "pricing" } })
+        : notify.error("Couldn't regenerate this variant", { description: `The previous version was kept. ${errorMessage(e)}` }),
+    );
+
+  // Kênh lấy từ lần tạo (form có thể đã đổi sau đó), generationId theo từng biến thể.
+  const saveVariant = async (v: GeneratedVariant, generationId: string | null) => {
     await save
-      .mutateAsync({ channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId: state.generationId })
+      .mutateAsync({ channel: state.input?.channel ?? channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId })
       .then(() => notify.success("Saved to drafts", { description: "Find it in Saved drafts and on the Content Calendar." }))
       .catch(() => {
         // lỗi đã hiện bằng toast từ MutationCache; ném lại để thẻ không báo "đã lưu"
@@ -140,7 +148,14 @@ export function Studio({ projectId, projectName, language }: { projectId: string
           {state.variants.length > 0 && (
             <div className="space-y-4" key={state.run}>
               {state.variants.map((v, i) => (
-                <VariantCard key={i} index={i} state={v} saving={save.isPending} onSave={saveVariant} />
+                <VariantCard
+                  key={`${i}-${v.rev}`}
+                  index={i}
+                  state={v}
+                  saving={save.isPending}
+                  onSave={(data) => saveVariant(data, v.generationId)}
+                  onRegenerate={isStreaming ? undefined : () => void regenerateVariant(i)}
+                />
               ))}
             </div>
           )}

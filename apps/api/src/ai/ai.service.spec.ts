@@ -17,10 +17,12 @@ const user = { id: 'user_1', plan: 'free' } as AuthUser;
 const prepared = {
   generationId: 'gen_1',
   channel: 'FACEBOOK' as const,
+  language: 'vi' as const,
   businessAddress: null,
   avoidWords: [],
   system: 'system',
   prompt: 'prompt',
+  single: undefined,
 };
 
 function setup(
@@ -102,6 +104,7 @@ test('streams partial variants then persists measured usage and completion', asy
     10,
     expect.any(Date),
     expect.any(Date),
+    3,
   );
   expect(repository.finish).toHaveBeenCalledWith(
     'gen_1',
@@ -109,6 +112,7 @@ test('streams partial variants then persists measured usage and completion', asy
     11,
     23,
     null,
+    3,
   );
 });
 
@@ -130,6 +134,7 @@ test('repairs a hard violation once without another quota reservation', async ()
     prepared.system,
     expect.stringContaining('từ/cụm bị cấm'),
     expect.any(AbortSignal),
+    3,
   );
   expect(repository.reserve).not.toHaveBeenCalled();
   expect(repository.finish).toHaveBeenCalledWith(
@@ -138,6 +143,7 @@ test('repairs a hard violation once without another quota reservation', async ()
     22,
     46,
     null,
+    3,
   );
   expect(events.at(-1)?.event).toBe('done');
 });
@@ -193,4 +199,63 @@ test('emits error after two invalid outputs and never emits variant.done', async
     46,
     'AI_GENERATION_FAILED',
   );
+});
+
+test('single regeneration repairs wrong cardinality once and records one completed output', async () => {
+  const { service, repository, openai } = setup([
+    { finishReason: 'stop', generated: output },
+    { finishReason: 'stop', generated: { variants: [variant] } },
+  ]);
+  const single = await service.prepare(
+    'project_1',
+    user,
+    'request_1',
+    { channel: 'FACEBOOK', goal: 'Giới thiệu', topic: 'Shop' },
+    { others: [variant], index: 1 },
+  );
+  const events = [];
+  for await (const event of service.stream(
+    single,
+    new AbortController().signal,
+  ))
+    events.push(event);
+  expect(repository.reserve).toHaveBeenCalledTimes(1);
+  expect(repository.reserve).toHaveBeenCalledWith(
+    'project_1',
+    'user_1',
+    'request_1',
+    expect.objectContaining({
+      channel: 'FACEBOOK',
+      others: [variant],
+      index: 1,
+    }),
+    expect.objectContaining({ language: 'vi' }),
+    'test-model',
+    10,
+    expect.any(Date),
+    expect.any(Date),
+    1,
+  );
+  expect(openai.stream).toHaveBeenCalledTimes(2);
+  expect(openai.stream).toHaveBeenLastCalledWith(
+    single.system,
+    expect.stringContaining('1 biến thể'),
+    expect.any(AbortSignal),
+    1,
+  );
+  expect(repository.finish).toHaveBeenCalledWith(
+    'gen_1',
+    'SUCCEEDED',
+    22,
+    46,
+    null,
+    1,
+  );
+  const complete = events.filter((event) => event.event === 'variant.done');
+  expect(complete).toHaveLength(1);
+  expect(complete[0].data).toEqual({ index: 1, variant });
+  expect(events.at(-1)?.data).toEqual({
+    generationId: 'gen_1',
+    variants: [variant],
+  });
 });

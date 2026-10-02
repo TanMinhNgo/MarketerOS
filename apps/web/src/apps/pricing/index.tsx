@@ -14,10 +14,10 @@ type Status = "now" | "soon";
 /** Nhãn, mô tả ngắn và trạng thái triển khai thật của từng tính năng (theo packages/docs/01-product-and-scope.md). */
 const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Status }> = {
   brand_brief: { label: "Brand Brief", blurb: "Describe your product, audience and tone once; every project keeps its own brief.", status: "now" },
-  content_generation: { label: "AI content generation", blurb: "Draft posts in your brand voice, with several variants to choose from.", status: "soon" },
+  content_generation: { label: "AI content generation", blurb: "Draft posts in your brand voice, with several variants to choose from.", status: "now" },
   image_generation: { label: "AI image generation", blurb: "Create visuals that follow the style you describe in your brief.", status: "soon" },
   personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and reference material.", status: "soon" },
-  content_calendar: { label: "Content calendar", blurb: "Plan drafts on a calendar and schedule them.", status: "soon" },
+  content_calendar: { label: "Content calendar", blurb: "Approve drafts, then plan and schedule them on a calendar.", status: "now" },
   more_projects: { label: "More projects", blurb: "Run more brands or clients side by side.", status: "soon" },
   strong_model: { label: "Advanced AI models", blurb: "A stronger model for longer, more nuanced writing.", status: "soon" },
   expanded_references: { label: "Expanded reference storage", blurb: "Keep more brand material close to the AI.", status: "soon" },
@@ -42,7 +42,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   { q: "Can I cancel?", a: "Yes, any time from Plans & Billing. You keep Pro until the end of the period you already paid for, and you are not charged again." },
   { q: "Do you store my card details?", a: "No. Card details are handled by Stripe through Clerk's billing, so MarketOS never sees them." },
   { q: "Where can I see my payments?", a: "In Plans & Billing, under Billing history, with the date, amount and status of every charge." },
-  { q: "Which features can I use today?", a: "Projects, Trash and Brand Brief are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
+  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation and the Content Calendar are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
   { q: "What are the usage limits?", a: "Limits such as the number of projects, daily generations and storage are still being finalized. We will publish exact numbers here before they take effect rather than guessing now." },
   { q: "Is there a team or student plan?", a: "Not yet. There are two plans for now: Free and Pro." },
 ];

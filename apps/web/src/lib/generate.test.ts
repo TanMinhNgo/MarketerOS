@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@clerk/nextjs", () => ({ getToken: vi.fn(async () => "tok_1") }));
 
 import { ApiError } from "./api-client";
-import { streamGenerate, type GenerateEvent } from "./generate";
+import { streamGenerate, streamRegenerate, type GenerateEvent } from "./generate";
 import { createSseParser, type SseEvent } from "./sse";
 
 const v = (n: number) => ({ title: `T${n}`, body: `B${n}`, hashtags: ["#a"], cta: "Go" });
@@ -82,5 +82,19 @@ describe("streamGenerate", () => {
     const events: GenerateEvent[] = [];
     await streamGenerate("p1", input, { onEvent: (e) => events.push(e) });
     expect(events.map((e) => e.type)).toEqual(["done"]);
+  });
+});
+
+describe("streamRegenerate", () => {
+  it("gọi /generate/variant và đọc done chỉ có 1 biến thể", async () => {
+    const fetchMock = vi.fn(async () => new Response(streamOf([sse("variant.delta", { index: 2, variant: { title: "N" } }), sse("done", { generationId: "g2", variants: [v(9)] })]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const events: GenerateEvent[] = [];
+    await streamRegenerate("p1", { input, others: [v(0), v(1)], index: 2 }, { onEvent: (e) => events.push(e) });
+    expect((fetchMock.mock.calls as unknown as [string][])[0][0]).toBe("/api/projects/p1/generate/variant");
+    expect(events).toEqual([
+      { type: "delta", index: 2, variant: { title: "N" } },
+      { type: "done", generationId: "g2", variants: [v(9)] },
+    ]);
   });
 });
