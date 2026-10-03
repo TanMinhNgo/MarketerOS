@@ -11,6 +11,7 @@ import { allChecked, ApproveChecklist } from "../content-studio/approve-checklis
 import { channelLabel } from "../content-studio/channels";
 import { NEXT_STATUSES, schedulePatch, STATUS_LABEL, type ContentStatus } from "../../lib/calendar-api";
 import { fromKey, toKey } from "../../lib/calendar-utils";
+import { PublishStatus } from "../integrations/publish-status";
 import { channelColor } from "./channel-colors";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -60,6 +61,7 @@ export function ItemDialog({ item, onClose, onSave }: { item: ContentResponse; o
 
         <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-sm">{item.body}</p>
         {!!item.hashtags.length && <p className="text-xs text-primary">{item.hashtags.join(" ")}</p>}
+        <PublishStatus projectId={item.projectId} item={item} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">

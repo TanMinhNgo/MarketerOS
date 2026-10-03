@@ -28,4 +28,12 @@ describe("postsCsv", () => {
     expect(row).toContain(`"'-50% hôm nay"`);
     expect(postsCsv([{ ...post, title: "=HYPERLINK(1)" }]).split("\r\n")[1].startsWith(`"'=HYPERLINK(1)"`)).toBe(true);
   });
+  it("thêm link và số liệu của lần đăng gần nhất; thiếu số liệu thì để trống", () => {
+    const csv = postsCsv([post], () => ({
+      id: "pub", contentId: "1", connectionId: "c", channel: "FACEBOOK", status: "PUBLISHED", scheduledAt: null, publishedAt: "2026-10-05T02:01:00.000Z",
+      externalUrl: "https://facebook.com/p/1", errorCode: null, title: "t",
+      latestMetric: { measuredAt: "2026-10-05T08:00:00.000Z", impressions: "1200", reach: "900", clicks: null, likes: "40", comments: "3", shares: null },
+    }));
+    expect(csv.split("\r\n")[1].endsWith('"2026-10-05 02:01","https://facebook.com/p/1","1200","900","40","3",""')).toBe(true);
+  });
 });
