@@ -31,8 +31,26 @@ const EnvironmentSchema = z
     OPENAI_API_KEY: z.string().trim().min(1),
     AI_MODEL: z.string().trim().min(1),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
+    META_APP_ID: z.string().optional(),
+    META_APP_SECRET: z.string().optional(),
+    LINKEDIN_CLIENT_ID: z.string().optional(),
+    LINKEDIN_CLIENT_SECRET: z.string().optional(),
+    OAUTH_CALLBACK_BASE: z
+      .url({ protocol: /^https?$/ })
+      .optional()
+      .or(z.literal('')),
+    TOKEN_ENCRYPTION_KEY: z.string().optional(),
   })
   .superRefine((env, context) => {
+    if (
+      env.TOKEN_ENCRYPTION_KEY &&
+      Buffer.from(env.TOKEN_ENCRYPTION_KEY, 'base64').length !== 32
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['TOKEN_ENCRYPTION_KEY'],
+        message: 'Expected base64 of 32 bytes.',
+      });
     if (
       Boolean(env.CLERK_SECRET_KEY) !== Boolean(env.CLERK_PUBLISHABLE_KEY) ||
       (env.NODE_ENV === 'production' && !env.CLERK_SECRET_KEY)

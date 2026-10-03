@@ -9,6 +9,8 @@ import { AutomationModule } from './automation/automation.module';
 import { AutomationExecutor } from './automation/automation.executor';
 import { AutomationWorker } from './automation/automation.worker';
 import { PromptBuilder } from './ai/prompt-builder';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { PublicationWorker } from './integrations/publication.worker';
 
 @Module({
   imports: [
@@ -21,7 +23,13 @@ import { PromptBuilder } from './ai/prompt-builder';
     AuthModule,
     AssistantModule,
     AutomationModule,
+    IntegrationsModule,
   ],
-  providers: [AutomationExecutor, AutomationWorker, PromptBuilder],
+  providers: [
+    AutomationExecutor,
+    AutomationWorker,
+    PublicationWorker,
+    PromptBuilder,
+  ],
 })
 export class WorkerModule {}

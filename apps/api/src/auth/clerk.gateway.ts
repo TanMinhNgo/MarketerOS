@@ -115,4 +115,22 @@ export class ClerkGateway {
         ),
     );
   }
+
+  async channelPublishingEntitled(clerkId: string): Promise<boolean> {
+    const subscription =
+      await this.client().billing.getUserBillingSubscription(clerkId);
+    const now = Date.now();
+    return subscription.subscriptionItems.some(
+      (item) =>
+        ['pro', 'max'].includes(item.plan?.slug ?? '') &&
+        ['active', 'canceled'].includes(item.status) &&
+        (item.periodEnd === null || item.periodEnd > now) &&
+        item.endedAt === null &&
+        (item.plan?.features.some(
+          (feature) =>
+            feature.slug === 'channel_connections_and_scheduled_publishing',
+        ) ??
+          false),
+    );
+  }
 }
