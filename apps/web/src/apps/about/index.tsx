@@ -13,13 +13,16 @@ const SHIPPED = [
   "Review and approve drafts, then schedule them on the Content Calendar",
   "Free, Pro and Max plans with usage limits, checkout and billing history",
   "Automations that write drafts, schedule approved posts and send weekly reports (Max)",
+  "Reports: where each project's posts stand and what's scheduled for the next 4 weeks",
+  "Settings for the beach scene, animations, notifications and window layout",
   "AI Assistant (Pro): chat per project, with suggested drafts, edits and schedules you apply in one click",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
 ];
 
 const NEXT = [
-  { name: "Media Library, Integrations, Reports", note: "Assets, social channels and performance." },
+  { name: "Integrations", note: "Connect social channels, then see how each post performs in Reports." },
+  { name: "Media Library", note: "AI images and your own uploads, attached to posts." },
 ];
 
 const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "TanStack Query", "NestJS", "PostgreSQL", "Clerk", "OpenAI"];

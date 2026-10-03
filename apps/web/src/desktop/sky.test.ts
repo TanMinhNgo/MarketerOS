@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeSky, SCENE, vnMinutes } from "./sky";
+import { clockMinutes, computeSky, SCENE } from "./sky";
+import { parseSkyPref, skyMinutes } from "./sky-pref";
 
 describe("computeSky", () => {
   it("ban ngày: mặt trời trên đường chân trời, trời sáng, không sao", () => {
@@ -40,9 +41,17 @@ describe("computeSky", () => {
   });
 });
 
-describe("vnMinutes", () => {
-  it("lấy giờ nguyên theo giờ Việt Nam (UTC+7), không theo múi giờ máy", () => {
-    expect(vnMinutes(new Date("2026-10-03T10:24:00Z"))).toBe(17 * 60);
-    expect(vnMinutes(new Date("2026-10-03T17:05:00Z"))).toBe(0);
+describe("clockMinutes / sky pref", () => {
+  const t = new Date("2026-10-03T10:24:00Z");
+  it("lấy giờ nguyên theo múi giờ chọn (mặc định Việt Nam), không theo múi giờ máy", () => {
+    expect(clockMinutes(undefined, t)).toBe(17 * 60);
+    expect(clockMinutes(undefined, new Date("2026-10-03T17:05:00Z"))).toBe(0);
+    expect(clockMinutes("Asia/Tokyo", t)).toBe(19 * 60);
+  });
+  it("cookie hỏng/lạ dùng mặc định; cảnh cố định bỏ qua đồng hồ", () => {
+    expect(parseSkyPref("not-json")).toEqual({ scene: "auto", tz: "Asia/Ho_Chi_Minh", motion: "system" });
+    expect(parseSkyPref(encodeURIComponent(JSON.stringify({ scene: "hack", tz: "Mars/Base", motion: "full" })))).toEqual({ scene: "auto", tz: "Asia/Ho_Chi_Minh", motion: "full" });
+    expect(skyMinutes({ scene: "night", tz: "Asia/Tokyo", motion: "system" }, t)).toBe(22 * 60);
+    expect(skyMinutes({ scene: "auto", tz: "Asia/Tokyo", motion: "system" }, t)).toBe(19 * 60);
   });
 });

@@ -5,7 +5,7 @@ import { MenuNav } from "./MenuNav";
 import { OpenAppButton } from "./OpenAppButton";
 import { SearchButton } from "./search/SearchButton";
 import { NotificationBell } from "./notifications/NotificationBell";
-import { UserAvatarButton } from "./UserAvatarButton";
+import { PlanChip, UserAvatarButton } from "./UserAvatarButton";
 
 export function MenuBar() {
   return (
@@ -16,6 +16,9 @@ export function MenuBar() {
       <div className="flex items-center gap-2">
         <Logo size={22} />
         <span className="font-display text-sm font-bold">MarketOS</span>
+        <Show when="signed-in">
+          <PlanChip />
+        </Show>
       </div>
       <MenuNav />
       <div className="flex-1" />
