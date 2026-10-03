@@ -68,11 +68,9 @@ export class ClerkGateway {
     )
       throw new UnauthorizedException();
     // MarketOS bills individual users, not an active Clerk organization.
-    const plan: PlanKey = auth.has({ plan: 'u:max' })
-      ? 'max'
-      : auth.has({ plan: 'u:pro' })
-        ? 'pro'
-        : 'free';
+    let plan: PlanKey = 'free';
+    if (auth.has({ plan: 'u:max' })) plan = 'max';
+    else if (auth.has({ plan: 'u:pro' })) plan = 'pro';
     return {
       clerkId: auth.userId,
       plan,

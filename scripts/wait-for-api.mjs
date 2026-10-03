@@ -31,7 +31,7 @@ export async function waitForApi(
     } catch {
       // Connection refused, startup errors and DB outages are retried until the deadline.
     }
-    await delay(Math.min(intervalMs, Math.max(0, deadline - Date.now())));
+    await delay(Math.min(intervalMs, Math.max(0, deadline - Date.now()))); // NOSONAR: polling interval precedes the next health probe.
   }
   throw new Error(
     `API chưa sẵn sàng sau ${timeoutMs / 1000}s. Kiểm tra log api:dev, cấu hình env và PostgreSQL.`,
@@ -58,8 +58,10 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
-  });
+  }
 }

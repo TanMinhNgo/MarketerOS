@@ -171,7 +171,7 @@ export class AssistantService {
     };
     const generator = this.generateReply(prepared, signal, state);
     let step = await generator.next();
-    while (!step.done) step = await generator.next();
+    while (!step.done) step = await generator.next(); // NOSONAR: each step depends on the prior stream state.
     if (!step.value || signal.aborted)
       throw new Error('Incomplete automation reply');
     return {

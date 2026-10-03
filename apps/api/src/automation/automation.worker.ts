@@ -68,20 +68,17 @@ export class AutomationWorker implements OnModuleInit, OnModuleDestroy {
         take: 100,
       });
       for (const run of queued) {
-        const previous = await this.queue!.getJob(run.id);
+        const previous = await this.queue!.getJob(run.id); // NOSONAR: dispatch follows createdAt order.
         // A provider/Clerk/Redis error before DB claim may retry dispatch; claimed runs never call model twice.
-        if (previous && (await previous.getState()) === 'failed')
-          await previous.remove();
-        await this.queue!.add(
-          'run',
-          {},
-          {
-            jobId: run.id,
-            attempts: 1,
-            removeOnComplete: { age: 86400 },
-            removeOnFail: { age: 86400 },
-          },
-        );
+        const state = previous && (await previous.getState()); // NOSONAR: check state before re-adding the job ID.
+        if (state === 'failed' && previous) await previous.remove(); // NOSONAR: removal precedes re-addition of the same job ID.
+        const options = {
+          jobId: run.id,
+          attempts: 1,
+          removeOnComplete: { age: 86400 },
+          removeOnFail: { age: 86400 },
+        };
+        await this.queue!.add('run', {}, options); // NOSONAR: finish dispatch before the next run.
       }
     } catch {
       this.logger.error(

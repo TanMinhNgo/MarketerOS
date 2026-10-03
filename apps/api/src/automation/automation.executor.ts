@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   ContentLanguageSchema,
   type AssistantAction,
+  type Automation,
   type CreateAutomationInput,
 } from '@marketos/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -39,7 +40,7 @@ export class AutomationExecutor {
         automation: { include: { project: { include: { owner: true } } } },
       },
     });
-    if (!initial || initial.status !== 'queued') return;
+    if (initial?.status !== 'queued') return;
     const { project } = initial.automation;
     if (!(await this.clerk.automationEntitled(project.owner.clerkId))) {
       await this.repository.pause(project.ownerId);
@@ -56,7 +57,7 @@ export class AutomationExecutor {
         where: { id: runId },
         include: { automation: true },
       });
-      if (!run || run.status !== 'queued') return null;
+      if (run?.status !== 'queued') return null;
       const brief = await tx.brandBrief.findUnique({
         where: { projectId: project.id },
       });
@@ -172,142 +173,16 @@ export class AutomationExecutor {
         );
         return;
       }
-      await this.prisma.$transaction(async (tx) => {
-        await this.repository.lock(tx, project.ownerId, project.id);
-        await tx.$queryRaw`SELECT id FROM "AutomationRun" WHERE id=${runId} FOR UPDATE`;
-        const current = await tx.automationRun.findUnique({
-          where: { id: runId },
-          include: { automation: true },
-        });
-        if (!current || current.status !== 'running') return;
-        const latestBrief = await tx.brandBrief.findUnique({
-          where: { projectId: project.id },
-        });
-        if (!latestBrief) {
-          await this.complete(
-            tx,
-            runId,
-            current.generationId,
-            'skipped',
-            'Thiếu Brand Brief.',
-          );
-          return;
-        }
-        const latest = {
-          ...latestBrief,
-          language: ContentLanguageSchema.parse(latestBrief.language),
-        };
-        for (const action of output.actions)
-          if (action.type === 'create_draft') {
-            if (
-              validateVariants(
-                [
-                  {
-                    title: action.title,
-                    body: action.body,
-                    hashtags: action.hashtags,
-                    cta: action.cta ?? '',
-                  },
-                ],
-                action.channel,
-                latest.avoidWords,
-                latest.businessAddress,
-                latest.language,
-                1,
-              ).length
-            )
-              throw new Error('Brief changed or draft invalid');
-          }
-        if (!current.automation.enabled) {
-          await this.complete(
-            tx,
-            runId,
-            current.generationId,
-            'skipped',
-            'Tác vụ đã tạm dừng.',
-          );
-          return;
-        }
-        const createdContentIds: string[] = [];
-        let scheduledContentIds: string[] = [];
-        let assistantMessageId: string | null = null;
-        let summary = output.content;
-        if (automation.type === 'schedule_ready') {
-          scheduledContentIds = await this.scheduleReady(
-            tx,
-            project.id,
-            automation,
-          );
-          summary = `Đã lên lịch ${scheduledContentIds.length} bài đã duyệt.`;
-        } else if (automation.type === 'weekly_report') {
-          const since = new Date(Date.now() - 7 * 86400_000);
-          const done = await tx.contentItem.count({
-            where: {
-              projectId: project.id,
-              status: 'DONE',
-              updatedAt: { gte: since },
-            },
-          });
-          const scheduled = await tx.contentItem.count({
-            where: { projectId: project.id, status: 'SCHEDULED' },
-          });
-          const drafts = await tx.contentItem.count({
-            where: { projectId: project.id, status: 'DRAFT' },
-          });
-          summary = `Báo cáo 7 ngày: ${done} bài được đánh dấu Done trong kỳ; ${scheduled} bài đang lên lịch; ${drafts} bài đang chờ duyệt. Done là trạng thái do người dùng ghi nhận, không xác minh đã đăng ngoài hệ thống.`;
-        } else {
-          for (const action of output.actions) {
-            if (action.type !== 'create_draft') continue;
-            const content = await tx.contentItem.create({
-              data: {
-                projectId: project.id,
-                channel: action.channel,
-                title: action.title,
-                body: action.body,
-                hashtags: action.hashtags,
-                cta: action.cta,
-                status: 'DRAFT',
-                scheduledAt: null,
-              },
-            });
-            createdContentIds.push(content.id);
-            action.status = 'applied';
-          }
-        }
-        if (
-          automation.type === 'custom_prompt' ||
-          automation.type === 'weekly_report'
-        ) {
-          const message = await tx.assistantMessage.create({
-            data: {
-              projectId: project.id,
-              generationId: current.generationId!,
-              automationId: automation.id,
-              role: 'assistant',
-              content: summary,
-              actions: output.actions,
-            },
-          });
-          assistantMessageId = message.id;
-        }
-        if (automation.type === 'write_posts')
-          summary = `Đã tạo ${createdContentIds.length} bài DRAFT chờ duyệt.`;
-        await this.complete(
+      await this.prisma.$transaction((tx) =>
+        this.saveResult(
           tx,
           runId,
-          current.generationId,
-          'succeeded',
-          summary,
-        );
-        await tx.automationRun.update({
-          where: { id: runId },
-          data: { createdContentIds, scheduledContentIds, assistantMessageId },
-        });
-        await tx.generation.updateMany({
-          where: { id: current.generationId!, kind: 'AUTOMATION' },
-          data: { tokensIn: output.tokensIn, tokensOut: output.tokensOut },
-        });
-      });
+          project.id,
+          project.ownerId,
+          automation,
+          output,
+        ),
+      );
     } catch {
       await this.prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "AutomationRun" WHERE id=${runId} FOR UPDATE`;
@@ -322,6 +197,184 @@ export class AutomationExecutor {
         );
       });
     }
+  }
+
+  private async saveResult(
+    tx: Prisma.TransactionClient,
+    runId: string,
+    projectId: string,
+    ownerId: string,
+    automation: Automation,
+    output: Output,
+  ) {
+    await this.repository.lock(tx, ownerId, projectId);
+    await tx.$queryRaw`SELECT id FROM "AutomationRun" WHERE id=${runId} FOR UPDATE`;
+    const current = await tx.automationRun.findUnique({
+      where: { id: runId },
+      include: { automation: true },
+    });
+    if (current?.status !== 'running') return;
+    const latestBrief = await tx.brandBrief.findUnique({
+      where: { projectId },
+    });
+    if (!latestBrief) {
+      await this.complete(
+        tx,
+        runId,
+        current.generationId,
+        'skipped',
+        'Thiếu Brand Brief.',
+      );
+      return;
+    }
+    this.validateCurrentBrief(output.actions, {
+      ...latestBrief,
+      language: ContentLanguageSchema.parse(latestBrief.language),
+    });
+    if (!current.automation.enabled) {
+      await this.complete(
+        tx,
+        runId,
+        current.generationId,
+        'skipped',
+        'Tác vụ đã tạm dừng.',
+      );
+      return;
+    }
+    const effects = await this.applyEffects(tx, projectId, automation, output);
+    let assistantMessageId: string | null = null;
+    if (
+      automation.type === 'custom_prompt' ||
+      automation.type === 'weekly_report'
+    ) {
+      const message = await tx.assistantMessage.create({
+        data: {
+          projectId,
+          generationId: current.generationId!,
+          automationId: automation.id,
+          role: 'assistant',
+          content: effects.summary,
+          actions: output.actions,
+        },
+      });
+      assistantMessageId = message.id;
+    }
+    await this.complete(
+      tx,
+      runId,
+      current.generationId,
+      'succeeded',
+      effects.summary,
+    );
+    await tx.automationRun.update({
+      where: { id: runId },
+      data: {
+        createdContentIds: effects.createdContentIds,
+        scheduledContentIds: effects.scheduledContentIds,
+        assistantMessageId,
+      },
+    });
+    await tx.generation.updateMany({
+      where: { id: current.generationId!, kind: 'AUTOMATION' },
+      data: { tokensIn: output.tokensIn, tokensOut: output.tokensOut },
+    });
+  }
+
+  private validateCurrentBrief(
+    actions: AssistantAction[],
+    brief: BriefForPrompt,
+  ) {
+    for (const action of actions) {
+      if (action.type !== 'create_draft') continue;
+      const errors = validateVariants(
+        [
+          {
+            title: action.title,
+            body: action.body,
+            hashtags: action.hashtags,
+            cta: action.cta ?? '',
+          },
+        ],
+        action.channel,
+        brief.avoidWords,
+        brief.businessAddress,
+        brief.language,
+        1,
+      );
+      if (errors.length) throw new Error('Brief changed or draft invalid');
+    }
+  }
+
+  private async applyEffects(
+    tx: Prisma.TransactionClient,
+    projectId: string,
+    automation: Automation,
+    output: Output,
+  ) {
+    const createdContentIds: string[] = [];
+    let scheduledContentIds: string[] = [];
+    let summary = output.content;
+    if (automation.type === 'schedule_ready') {
+      scheduledContentIds = await this.scheduleReady(tx, projectId, automation);
+      summary = `Đã lên lịch ${scheduledContentIds.length} bài đã duyệt.`;
+    } else if (automation.type === 'weekly_report') {
+      summary = await this.weeklyReport(tx, projectId);
+    } else {
+      createdContentIds.push(
+        ...(await this.createDrafts(tx, projectId, output.actions)),
+      );
+    }
+    if (automation.type === 'write_posts')
+      summary = `Đã tạo ${createdContentIds.length} bài DRAFT chờ duyệt.`;
+    return { createdContentIds, scheduledContentIds, summary };
+  }
+
+  private async weeklyReport(tx: Prisma.TransactionClient, projectId: string) {
+    const since = new Date(Date.now() - 7 * 86_400_000);
+    const done = await tx.contentItem.count({
+      where: { projectId, status: 'DONE', updatedAt: { gte: since } },
+    });
+    const scheduled = await tx.contentItem.count({
+      where: { projectId, status: 'SCHEDULED' },
+    });
+    const drafts = await tx.contentItem.count({
+      where: { projectId, status: 'DRAFT' },
+    });
+    return `Báo cáo 7 ngày: ${done} bài được đánh dấu Done trong kỳ; ${scheduled} bài đang lên lịch; ${drafts} bài đang chờ duyệt. Done là trạng thái do người dùng ghi nhận, không xác minh đã đăng ngoài hệ thống.`;
+  }
+
+  private async createDrafts(
+    tx: Prisma.TransactionClient,
+    projectId: string,
+    actions: AssistantAction[],
+  ) {
+    const ids: string[] = [];
+    for (const action of actions) {
+      if (action.type !== 'create_draft') continue;
+      const content = await this.createDraft(tx, projectId, action); // NOSONAR: preserve action order.
+      ids.push(content.id);
+      action.status = 'applied';
+    }
+    return ids;
+  }
+
+  private createDraft(
+    tx: Prisma.TransactionClient,
+    projectId: string,
+    action: Extract<AssistantAction, { type: 'create_draft' }>,
+  ) {
+    return tx.contentItem.create({
+      data: {
+        projectId,
+        channel: action.channel,
+        title: action.title,
+        body: action.body,
+        hashtags: action.hashtags,
+        cta: action.cta,
+        status: 'DRAFT',
+        scheduledAt: null,
+      },
+    });
   }
 
   private writeInstructions(
@@ -344,9 +397,13 @@ export class AutomationExecutor {
         return { index, channel, ...prompt };
       },
     );
+    const escapedInstructions = JSON.stringify(instructions).replaceAll(
+      '<',
+      '\\u003c',
+    );
     return {
       system: `Đây là write_posts: trả đúng ${automation.count} actions create_draft theo thứ tự kênh của từng yêu cầu. Không action khác. Mỗi yêu cầu bên dưới dùng luật PromptBuilder của kênh. Không gọi tool.`,
-      prompt: `<write_requests>${JSON.stringify(instructions).replaceAll('<', String.raw`\u003c`)}</write_requests>`,
+      prompt: `<write_requests>${escapedInstructions}</write_requests>`,
     };
   }
   private validateWrite(
@@ -414,18 +471,22 @@ export class AutomationExecutor {
     });
     const ids: string[] = [];
     for (const [index, content] of contents.entries()) {
-      const changed = await tx.contentItem.updateMany({
-        where: {
-          id: content.id,
-          projectId,
-          status: 'READY',
-          scheduledAt: null,
-        },
-        data: { status: 'SCHEDULED', scheduledAt: available[index] },
-      });
+      const slot = available[index];
+      const changed = await this.assignSlot(tx, content.id, projectId, slot); // NOSONAR: retain slot order under project lock.
       if (changed.count) ids.push(content.id);
     }
     return ids;
+  }
+  private assignSlot(
+    tx: Prisma.TransactionClient,
+    contentId: string,
+    projectId: string,
+    at: Date,
+  ) {
+    return tx.contentItem.updateMany({
+      where: { id: contentId, projectId, status: 'READY', scheduledAt: null },
+      data: { status: 'SCHEDULED', scheduledAt: at },
+    });
   }
   private async complete(
     tx: Prisma.TransactionClient,
@@ -451,16 +512,16 @@ export class AutomationExecutor {
           : {}),
       },
     });
-    if (generationId)
+    if (generationId) {
+      const generationStatus = {
+        succeeded: 'SUCCEEDED',
+        failed: 'FAILED',
+        skipped: 'CANCELLED',
+      } as const;
       await tx.generation.updateMany({
         where: { id: generationId, status: 'PENDING', kind: 'AUTOMATION' },
         data: {
-          status:
-            status === 'succeeded'
-              ? 'SUCCEEDED'
-              : status === 'failed'
-                ? 'FAILED'
-                : 'CANCELLED',
+          status: generationStatus[status],
           completedOutputs: status === 'succeeded' ? 1 : 0,
           completedAt: new Date(),
           errorCode:
@@ -469,6 +530,7 @@ export class AutomationExecutor {
               : 'AUTOMATION_' + status.toUpperCase(),
         },
       });
+    }
   }
   private async finishSkipped(
     runId: string,
@@ -508,27 +570,31 @@ export class AutomationExecutor {
       },
       take: 100,
     });
-    for (const run of runs)
-      await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT id FROM "AutomationRun" WHERE id=${run.id} FOR UPDATE`;
-        const changed = await tx.automationRun.updateMany({
-          where: { id: run.id, status: 'running' },
+    for (const run of runs) {
+      await this.failStaleRun(run); // NOSONAR: row-lock transactions run in order to bound DB load.
+    }
+  }
+  private failStaleRun(run: { id: string; generationId: string | null }) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "AutomationRun" WHERE id=${run.id} FOR UPDATE`;
+      const changed = await tx.automationRun.updateMany({
+        where: { id: run.id, status: 'running' },
+        data: {
+          status: 'failed',
+          finishedAt: new Date(),
+          summary: 'Worker bị gián đoạn. Không chạy lại model.',
+        },
+      });
+      if (changed.count && run.generationId)
+        await tx.generation.updateMany({
+          where: { id: run.generationId, status: 'PENDING' },
           data: {
-            status: 'failed',
-            finishedAt: new Date(),
-            summary: 'Worker bị gián đoạn. Không chạy lại model.',
+            status: 'FAILED',
+            completedAt: new Date(),
+            errorCode: 'WORKER_INTERRUPTED',
           },
         });
-        if (changed.count && run.generationId)
-          await tx.generation.updateMany({
-            where: { id: run.generationId, status: 'PENDING' },
-            data: {
-              status: 'FAILED',
-              completedAt: new Date(),
-              errorCode: 'WORKER_INTERRUPTED',
-            },
-          });
-      });
+    });
   }
   async reconcileDueEntitlements() {
     const items = await this.prisma.automation.findMany({
@@ -543,8 +609,9 @@ export class AutomationExecutor {
     const owners = new Map(
       items.map((item) => [item.project.ownerId, item.project.owner.clerkId]),
     );
-    for (const [userId, clerkId] of owners)
-      if (!(await this.clerk.automationEntitled(clerkId)))
-        await this.repository.pause(userId);
+    for (const [userId, clerkId] of owners) {
+      const entitled = await this.clerk.automationEntitled(clerkId); // NOSONAR: bound Clerk requests.
+      if (!entitled) await this.repository.pause(userId); // NOSONAR: pause follows the entitlement check for this user.
+    }
   }
 }

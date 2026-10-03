@@ -98,32 +98,36 @@ export class ClerkWebhookController {
     }
     const event = eventSchema.safeParse(payload);
     if (!event.success) throw new BadRequestException();
-    if (event.data.type === 'user.deleted') {
-      const user = deletedUserSchema.safeParse(event.data.data);
+    await this.handleEvent(event.data);
+    // deleteMany is idempotent: retries and already-absent users need no event table.
+    return { received: true };
+  }
+
+  private async handleEvent(event: z.infer<typeof eventSchema>) {
+    if (event.type === 'user.deleted') {
+      const user = deletedUserSchema.safeParse(event.data);
       if (!user.success) throw new BadRequestException();
       await this.users.delete(user.data.id);
     }
-    if (/^subscription(?:Item)?\./.test(event.data.type)) {
-      const data = z
-        .object({
-          payer: z.object({ user_id: z.string().min(1) }).passthrough(),
-        })
-        .passthrough()
-        .safeParse(event.data.data);
-      if (!data.success) throw new BadRequestException();
-      const user = await this.users.find(data.data.payer.user_id);
-      if (user) {
-        // Do not trust event ordering or an event's cached plan: query current Clerk state.
-        let entitled: boolean;
-        try {
-          entitled = await this.clerk.automationEntitled(user.clerkId);
-        } catch {
-          throw new ServiceUnavailableException();
-        }
-        if (!entitled) await this.users.syncPlan(user.id, 'free', false);
-      }
+    if (/^subscription(?:Item)?\./.test(event.type))
+      await this.handleSubscriptionEvent(event.data);
+  }
+
+  private async handleSubscriptionEvent(payload: unknown) {
+    const data = z
+      .object({ payer: z.object({ user_id: z.string().min(1) }).passthrough() })
+      .passthrough()
+      .safeParse(payload);
+    if (!data.success) throw new BadRequestException();
+    const user = await this.users.find(data.data.payer.user_id);
+    if (!user) return;
+    // Do not trust event ordering or an event's cached plan: query current Clerk state.
+    let entitled: boolean;
+    try {
+      entitled = await this.clerk.automationEntitled(user.clerkId);
+    } catch {
+      throw new ServiceUnavailableException();
     }
-    // deleteMany is idempotent: retries and already-absent users need no event table.
-    return { received: true };
+    if (!entitled) await this.users.syncPlan(user.id, 'free', false);
   }
 }

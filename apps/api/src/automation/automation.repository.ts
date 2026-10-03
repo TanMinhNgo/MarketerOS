@@ -263,7 +263,7 @@ export class AutomationRepository {
       return runResponse(run);
     });
   }
-  async runs(
+  runs(
     projectId: string,
     userId: string,
     id: string,
@@ -317,13 +317,7 @@ export class AutomationRepository {
     });
     for (const item of items) {
       try {
-        await this.reserve(
-          item.projectId,
-          item.project.ownerId,
-          item.id,
-          `schedule-${item.id}-${item.nextRunAt!.toISOString()}`,
-          item.nextRunAt!,
-        );
+        await this.reserveDue(item); // NOSONAR: user/project locks serialize quota reservations.
       } catch (error) {
         if (!(
           error instanceof NotFoundException ||
@@ -332,5 +326,14 @@ export class AutomationRepository {
           throw error;
       }
     }
+  }
+  private reserveDue(item: Automation & { project: { ownerId: string } }) {
+    return this.reserve(
+      item.projectId,
+      item.project.ownerId,
+      item.id,
+      `schedule-${item.id}-${item.nextRunAt!.toISOString()}`,
+      item.nextRunAt!,
+    );
   }
 }
