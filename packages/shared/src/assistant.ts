@@ -85,6 +85,7 @@ export const AssistantMessageSchema = z
     content: z.string().min(1).max(12000),
     createdAt: z.iso.datetime(),
     actions: z.array(AssistantActionSchema).max(5),
+    automationId: id.nullable().optional(),
   })
   .strict();
 export type AssistantMessage = z.infer<typeof AssistantMessageSchema>;
