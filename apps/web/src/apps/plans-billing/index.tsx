@@ -7,10 +7,10 @@ import { ChartNoAxesColumn, CreditCard, Receipt, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { notify } from "@/lib/notify/notify";
 import { AuthGate } from "@/components/auth-gate";
+import { Card, Meter } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWindowStore } from "@/desktop/window-store";
-import { Progress } from "@/components/ui/progress";
 import { errorMessage } from "@/lib/api-client";
 import { keys, useMe, useUsage } from "@/lib/queries";
 import { PLAN_CATALOG, PLAN_LIMITS } from "@marketos/shared";
@@ -19,37 +19,7 @@ import { cn } from "@/lib/utils";
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 const fmt = (d: Date | null | undefined) => (d ? day.format(d) : "-");
 
-function Card({ icon: Icon, title, children, action }: { icon: typeof Sparkles; title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <section aria-label={title} className="rounded-2xl border-2 border-[#3B2A4A]/40 bg-card p-4">
-      <header className="mb-3 flex items-center gap-2">
-        <Icon className="size-4 text-primary" aria-hidden="true" />
-        <h3 className="font-display text-base font-bold">{title}</h3>
-        <div className="flex-1" />
-        {action}
-      </header>
-      {children}
-    </section>
-  );
-}
-
 const Muted = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-muted-foreground">{children}</p>;
-
-function Meter({ label, used, limit, hint }: { label: string; used: number; limit: number; hint: string }) {
-  const full = used >= limit;
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="font-medium">{label}</span>
-        <span className={cn("tabular-nums", full ? "font-semibold text-destructive" : "text-muted-foreground")}>
-          {used} / {limit}
-        </span>
-      </div>
-      <Progress value={Math.min(100, (used / limit) * 100)} aria-label={`${label}: ${used} of ${limit} used`} className={cn(full && "[&>[data-slot=progress-indicator]]:bg-destructive")} />
-      <p className="text-xs text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
 
 /** Số đã dùng / giới hạn của gói trong kỳ, do backend đo (không tự tính ở client). */
 function Usage() {
