@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { PLAN_CATALOG, type FeatureKey, type PlanKey } from "@marketos/shared";
+import { PLAN_CATALOG, PLAN_LIMITS, type FeatureKey, type PlanKey } from "@marketos/shared";
 import { Check, ChevronDown, CreditCard, Minus, Rocket, ShieldCheck, Sparkles, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,19 @@ import { cn } from "@/lib/utils";
 
 type Status = "now" | "soon";
 
+const L = PLAN_LIMITS;
+const n = (v: number) => v.toLocaleString("en-US");
+
+/** Hạn mức của một gói thành câu, lấy từ PLAN_LIMITS (cùng nguồn backend dùng để chặn). */
+function limitsText(key: PlanKey): string {
+  const l: { projects: number; text: number; assistant?: number; automations?: number; automationRuns?: number } = L[key];
+  const parts = [`${n(l.projects)} active projects`, `${n(l.text)} AI generations`];
+  if (l.assistant) parts.push(`${n(l.assistant)} AI Assistant messages`);
+  if (l.automations) parts.push(`${n(l.automations)} automations turned on`);
+  if (l.automationRuns) parts.push(`${n(l.automationRuns)} automation runs`);
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)} a month`;
+}
+
 /** Nhãn, mô tả ngắn và trạng thái triển khai thật của từng tính năng (theo packages/docs/01-product-and-scope.md). */
 const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Status }> = {
   brand_brief: { label: "Brand Brief", blurb: "Describe your product, audience and tone once; every project keeps its own brief.", status: "now" },
@@ -18,15 +31,16 @@ const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Statu
   image_generation: { label: "AI image generation", blurb: "Create visuals that follow the style you describe in your brief.", status: "soon" },
   personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and reference material.", status: "soon" },
   content_calendar: { label: "Content calendar", blurb: "Approve drafts, then plan and schedule them on a calendar.", status: "now" },
-  more_projects: { label: "More projects", blurb: "Run up to 20 brands or clients side by side (Free: 3).", status: "now" },
+  more_projects: { label: "More projects", blurb: `Run up to ${L.max.projects} brands or clients side by side (Pro: ${L.pro.projects}, Free: ${L.free.projects}).`, status: "now" },
   strong_model: { label: "Advanced AI models", blurb: "A stronger model for longer, more nuanced writing.", status: "soon" },
   expanded_references: { label: "Expanded reference storage", blurb: "Keep more brand material close to the AI.", status: "soon" },
   channel_publishing: { label: "Channels and scheduled publishing", blurb: "Connect social channels and publish on schedule.", status: "soon" },
-  ai_assistant: { label: "Project-aware AI assistant", blurb: "Chat about a project; it suggests drafts, edits, schedules and brief changes you apply in one click. 300 messages a month.", status: "now" },
+  ai_assistant: { label: "Project-aware AI assistant", blurb: `Chat about a project; it suggests drafts, edits, schedules and brief changes you apply in one click. ${n(L.pro.assistant)} messages a month on Pro.`, status: "now" },
   content_analytics: { label: "Content performance analytics", blurb: "See what is working across channels.", status: "soon" },
+  automation: { label: "Automations", blurb: `Write drafts, schedule approved posts and get weekly reports on a schedule. You still review everything. ${L.max.automations} automations, ${L.max.automationRuns} runs a month.`, status: "now" },
 };
 
-const PLAN_KEYS: PlanKey[] = ["free", "pro"];
+const PLAN_KEYS: PlanKey[] = ["free", "pro", "max"];
 const ALL_FEATURES = Object.keys(FEATURES) as FeatureKey[];
 
 const price = (cents: number) => (cents === 0 ? "$0" : `$${cents / 100}`);
@@ -34,17 +48,19 @@ const price = (cents: number) => (cents === 0 ? "$0" : `$${cents / 100}`);
 const WHO: Record<PlanKey, string> = {
   free: "Trying MarketOS, or running a single brand on your own.",
   pro: "Freelancers and small businesses who manage several brands and want to publish across channels.",
+  max: "Busy marketers and agencies who want the routine work done on a schedule, with a human still approving.",
 };
 
 const FAQ: { q: string; a: ReactNode }[] = [
   { q: "Is the Free plan really free?", a: "Yes. You can sign up and use the Free plan without entering a payment card." },
-  { q: "How do I upgrade?", a: "Open Plans & Billing and press Upgrade to Pro. A secure checkout opens where you add a card. Your plan updates as soon as the payment goes through." },
-  { q: "Can I cancel?", a: "Yes, any time from Plans & Billing. You keep Pro until the end of the period you already paid for, and you are not charged again." },
+  { q: "How do I upgrade?", a: "Open Plans & Billing and press Upgrade to Pro or Upgrade to Max. A secure checkout opens where you add a card. Your plan updates as soon as the payment goes through." },
+  { q: "Can I cancel?", a: "Yes, any time from Plans & Billing. You keep your paid plan until the end of the period you already paid for, and you are not charged again." },
   { q: "Do you store my card details?", a: "No. Card details are handled by Stripe through Clerk's billing, so MarketOS never sees them." },
   { q: "Where can I see my payments?", a: "In Plans & Billing, under Billing history, with the date, amount and status of every charge." },
-  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation, the Content Calendar and (on Pro) the AI Assistant are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
-  { q: "What are the usage limits?", a: "Free: 3 active projects and 10 AI generations a month. Pro: 20 active projects and 200 AI generations a month. One generation writes 3 variants, and every 3 single-variant regenerates count as 1. Generations reset on the 1st of each month (UTC); projects in Trash don't count. You can see your usage in Plans & Billing." },
-  { q: "Is there a team or student plan?", a: "Not yet. There are two plans for now: Free and Pro." },
+  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation, the Content Calendar, the AI Assistant (Pro and Max) and Automations (Max) are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
+  { q: "What are the usage limits?", a: `Free: ${limitsText("free")}. Pro: ${limitsText("pro")}. Max: ${limitsText("max")}. One generation writes 3 variants, and every 3 single-variant regenerates count as 1. Generations reset on the 1st of each month (UTC); projects in Trash don't count. You can see your usage in Plans & Billing.` },
+  { q: "Is there a team or student plan?", a: "Not yet. There are three plans for now: Free, Pro and Max." },
+  { q: "Do automations post or approve anything on their own?", a: "No. Automations on Max write drafts that wait in Needs review, schedule only posts you already approved, and send reports to the AI Assistant chat. They never approve, delete or mark posts as Done." },
 ];
 
 function Section({ id, title, intro, children }: { id: string; title: string; intro?: string; children: ReactNode }) {
@@ -73,15 +89,15 @@ export default function App() {
 
   const cta = (key: PlanKey) => {
     if (key === "free") return { label: isSignedIn ? "Open Projects" : "Get started free", run: () => open(isSignedIn ? "projects" : "sign-up") };
-    return { label: "Upgrade to Pro", run: () => open(isSignedIn ? "plans-billing" : "sign-up") };
+    return { label: `Upgrade to ${PLAN_CATALOG[key].name}`, run: () => open(isSignedIn ? "plans-billing" : "sign-up") };
   };
 
   return (
-    <div className="@container mx-auto max-w-3xl p-6">
+    <div className="@container mx-auto w-11/12 py-6">
       <header className="text-center">
         <h2 className="font-display text-3xl font-bold">Start free. Upgrade when you outgrow it.</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-          MarketOS keeps pricing simple: one free plan to get going, and one Pro plan when your marketing grows. Prices are in USD and billed monthly.
+          MarketOS keeps pricing simple: a free plan to get going, Pro when your marketing grows, and Max when you want it to run on a schedule. Prices are in USD and billed monthly.
         </p>
         <ul className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-semibold">
           {[
@@ -100,7 +116,7 @@ export default function App() {
         </ul>
       </header>
 
-      <div className="mt-8 grid gap-4 @xl:grid-cols-2">
+      <div className="mt-8 grid gap-4 @xl:grid-cols-3">
         {PLAN_KEYS.map((key) => {
           const plan = PLAN_CATALOG[key];
           const isCurrent = current === key;
@@ -109,11 +125,11 @@ export default function App() {
             <section
               key={key}
               aria-labelledby={`plan-${key}`}
-              className={cn("flex flex-col rounded-2xl border-2 bg-card p-5", key === "pro" ? "border-primary shadow-[0_5px_0_rgba(109,91,255,0.35)]" : "border-[#3B2A4A]/50")}
+              className={cn("flex flex-col rounded-2xl border-2 bg-card p-5", key !== "free" ? "border-primary shadow-[0_5px_0_rgba(109,91,255,0.35)]" : "border-[#3B2A4A]/50")}
             >
               <div className="flex items-center gap-2">
                 <h3 id={`plan-${key}`} className="font-display text-xl font-bold">{plan.name}</h3>
-                {key === "pro" && <Sparkles className="size-4 text-primary" aria-hidden="true" />}
+                {key !== "free" && <Sparkles className="size-4 text-primary" aria-hidden="true" />}
                 {isCurrent && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">Current plan</span>}
               </div>
               <p className="mt-2 flex items-baseline gap-1">
@@ -131,7 +147,7 @@ export default function App() {
                   </li>
                 ))}
               </ul>
-              <Button variant={key === "pro" ? "default" : "outline"} disabled={isCurrent} onClick={action.run}>
+              <Button variant={key !== "free" ? "default" : "outline"} disabled={isCurrent} onClick={action.run}>
                 {isCurrent ? "You're on this plan" : action.label}
               </Button>
             </section>
@@ -147,6 +163,7 @@ export default function App() {
                 <th scope="col" className="px-3 py-2 font-semibold">Feature</th>
                 <th scope="col" className="px-3 py-2 text-center font-semibold">Free</th>
                 <th scope="col" className="px-3 py-2 text-center font-semibold">Pro</th>
+                <th scope="col" className="px-3 py-2 text-center font-semibold">Max</th>
                 <th scope="col" className="px-3 py-2 font-semibold">Status</th>
               </tr>
             </thead>
@@ -180,8 +197,8 @@ export default function App() {
         <ol className="grid gap-3 @xl:grid-cols-3">
           {[
             [Rocket, "Start on Free", "Create an account with Google or email. No card is needed."],
-            [Sparkles, "Upgrade when ready", "Open Plans & Billing and choose Upgrade to Pro. Checkout is secure and quick."],
-            [Undo2, "Stay in control", "Cancel from Plans & Billing and keep Pro until the end of the period you paid for."],
+            [Sparkles, "Upgrade when ready", "Open Plans & Billing and choose Pro or Max. Checkout is secure and quick."],
+            [Undo2, "Stay in control", "Cancel from Plans & Billing and keep your plan until the end of the period you paid for."],
           ].map(([Icon, title, text], i) => {
             const I = Icon as typeof Rocket;
             return (
@@ -218,11 +235,12 @@ export default function App() {
 
       <Section id="pricing-limits" title="About limits" intro="We would rather be clear than clever.">
         <ul className="space-y-1 text-sm leading-relaxed">
-          <li><strong>Free:</strong> 3 active projects and 10 AI generations a month.</li>
-          <li><strong>Pro:</strong> 20 active projects, 200 AI generations and 300 AI Assistant messages a month.</li>
+          {PLAN_KEYS.map((k) => (
+            <li key={k}><strong>{PLAN_CATALOG[k].name}:</strong> {limitsText(k)}.</li>
+          ))}
         </ul>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Every generation writes 3 variants on both plans. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. Limits for images and storage will be published here before those features launch.
+          Every generation writes 3 variants on every plan. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. Limits for images and storage will be published here before those features launch.
         </p>
       </Section>
 

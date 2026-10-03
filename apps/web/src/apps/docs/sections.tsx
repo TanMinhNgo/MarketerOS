@@ -1,3 +1,4 @@
+import { PLAN_LIMITS } from "@marketos/shared";
 import type { ReactNode } from "react";
 import { Callout, Figure, H, Kbd, P, Step, Steps, Table } from "./parts";
 
@@ -260,7 +261,33 @@ export const SECTIONS: DocSection[] = [
             ["Brand Brief change", "Updates only the fields shown; everything else in the brief stays the same."],
           ]}
         />
-        <Callout kind="note">The assistant never approves, deletes or marks posts as Done. Pro includes 300 messages a month; your usage is in Plans &amp; Billing. Clear deletes the project&apos;s chat history but doesn&apos;t give messages back.</Callout>
+        <Callout kind="note">The assistant never approves, deletes or marks posts as Done. Pro includes {PLAN_LIMITS.pro.assistant} messages a month; your usage is in Plans &amp; Billing. Clear deletes the project&apos;s chat history but doesn&apos;t give messages back.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "automations",
+    title: "Automations",
+    summary: "Let routine work run on a schedule, with your review (Max).",
+    body: (
+      <>
+        <P>Automations are part of <strong>Max</strong> and belong to the <strong>selected project</strong>. The project needs a Brand Brief, or its automations are skipped.</P>
+        <Steps>
+          <Step title="Open Automations">Double-click its clock icon and press <strong>New automation</strong>.</Step>
+          <Step title="Choose what it does">Pick a type, fill in its settings and give it a name.</Step>
+          <Step title="Choose when it runs">Every day, on chosen weekdays or on a day of the month, at a time in your time zone.</Step>
+          <Step title="Check the results">Open <strong>History</strong> on an automation to see each run and jump to the drafts, the calendar or the chat it touched. <strong>Run now</strong> tries it straight away.</Step>
+        </Steps>
+        <Table
+          head={["Type", "What it does"]}
+          rows={[
+            ["Write posts", "Writes 1–5 drafts for the channels you pick. They wait in Needs review."],
+            ["Schedule approved posts", "Puts approved posts without a date into your time slots over the next days, skipping slots that already have a post."],
+            ["Weekly report", "Sends a summary of done, scheduled and waiting posts to the project's AI Assistant chat."],
+            ["Custom instruction", "Runs your instruction like an assistant message. Drafts are saved for review; other suggestions wait for you to press Apply in the chat."],
+          ]}
+        />
+        <Callout kind="note">Automations never approve, delete or mark posts as Done. Max includes {PLAN_LIMITS.max.automations} automations turned on (across all projects) and {PLAN_LIMITS.max.automationRuns} runs a month; every run counts, even one that fails or is skipped. Pausing turns off future runs; if your plan leaves Max, every automation is paused and stays paused until you turn it back on.</Callout>
       </>
     ),
   },
@@ -288,16 +315,16 @@ export const SECTIONS: DocSection[] = [
         <H>Compare plans</H>
         <Steps>
           <Step title="Open Pricing">Choose Pricing in the menu bar.</Step>
-          <Step title="Read the plans">Free and Pro are listed with price and everything each includes. Your current plan is marked once you are signed in.</Step>
+          <Step title="Read the plans">Free, Pro and Max are listed with price and everything each includes. Your current plan is marked once you are signed in.</Step>
         </Steps>
         <H>Manage your plan</H>
         <Table
           head={["I want to…", "Do this"]}
           rows={[
-            ["Upgrade", "Open Plans & Billing and press Upgrade to Pro. A secure checkout opens."],
+            ["Upgrade", "Open Plans & Billing and press Upgrade to Pro or Upgrade to Max. A secure checkout opens."],
             ["See my next payment", "Your plan card shows the next payment amount and date."],
-            ["See my usage", "The Usage card shows active projects and AI generations used this month, and when generations reset. Free: 3 projects, 10 generations. Pro: 20 projects, 200 generations."],
-            ["Cancel", "Press Cancel plan and confirm. You keep Pro until the end of the period you paid for."],
+            ["See my usage", `The Usage card shows active projects and AI generations used this month, and when generations reset. Free: ${PLAN_LIMITS.free.projects} projects, ${PLAN_LIMITS.free.text} generations. Pro: ${PLAN_LIMITS.pro.projects} projects, ${PLAN_LIMITS.pro.text} generations. Max: ${PLAN_LIMITS.max.projects} projects, ${PLAN_LIMITS.max.text} generations, plus automations turned on and automation runs.`],
+            ["Cancel", "Press Cancel plan and confirm. You keep your paid plan until the end of the period you paid for."],
             ["Check my payments", "Billing history lists every charge with its date, amount and status."],
             ["Update my card", "Press Manage payment methods to open your Account."],
           ]}
