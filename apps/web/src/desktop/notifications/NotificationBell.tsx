@@ -41,7 +41,7 @@ function Row({ n, onOpen }: { n: AppNotification; onOpen: (n: AppNotification) =
   );
 }
 
-function Toggle({ id, label, hint, checked, onChange }: { id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ id, label, hint, checked, onChange }: Readonly<{ id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }>) {
   return (
     <div className="flex items-start gap-3 py-2">
       <div className="min-w-0 flex-1">
@@ -62,7 +62,8 @@ function Toggle({ id, label, hint, checked, onChange }: { id: string; label: str
   );
 }
 
-function Settings() {
+/** Cài đặt thông báo: dùng trong chuông và app Settings. */
+export function NotificationSettings() {
   const prefs = useNotifications((s) => s.prefs);
   const setPrefs = useNotifications((s) => s.setPrefs);
   const [blocked, setBlocked] = useState(osPermission() === "denied");
@@ -151,7 +152,7 @@ export function NotificationBell() {
           </header>
 
           {view === "settings" ? (
-            <Settings />
+            <NotificationSettings />
           ) : items.length === 0 ? (
             <div className="grid place-items-center px-6 py-10 text-center">
               <BellOff className="size-8 text-muted-foreground" aria-hidden="true" />

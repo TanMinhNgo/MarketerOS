@@ -13,12 +13,17 @@ import { SearchPalette } from "./search/SearchPalette";
 import { Taskbar } from "./Taskbar";
 import { useLayoutPersist, useUrlSync } from "./use-desktop-sync";
 import { useIsMobile } from "./use-mobile";
-import { useSky } from "./use-sky";
+import { useSky, useSkyPref } from "./use-sky";
 import { WindowLayer } from "./WindowLayer";
 import { useWindowStore } from "./window-store";
 
 export function Desktop({ skyMinutes }: Readonly<{ skyMinutes: number }>) {
   const sky = useSky(skyMinutes);
+  // Giảm chuyển động (Settings): "system" theo hệ điều hành, xem globals.css.
+  const motion = useSkyPref((s) => s.pref.motion);
+  useEffect(() => {
+    document.documentElement.dataset.motion = motion;
+  }, [motion]);
   const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const open = useWindowStore((s) => s.open);

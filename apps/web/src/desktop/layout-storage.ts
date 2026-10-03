@@ -34,6 +34,16 @@ export function saveLayout(windows: Geometry[]) {
   }
 }
 
+/** Quên kích thước/vị trí đã lưu của mọi app (Settings → Reset window layout). */
+export function clearLayout() {
+  cache = {};
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // bị chặn: không có gì để xoá
+  }
+}
+
 /** Chỉ dùng cho test. */
 export function resetLayoutCache() {
   cache = null;
