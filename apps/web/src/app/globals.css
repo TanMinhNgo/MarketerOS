@@ -140,6 +140,10 @@
 .swim-drift { animation: swim-drift 9s ease-in-out infinite alternate; }
 .tail-wag { animation: swim-arm 0.45s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 100% 50%; }
 .icon-bob { animation: icon-bob 4.5s ease-in-out infinite; }
+/* Hiệu ứng gói trả phí: viền avatar cầu vồng xoay (Max), nhãn Max ánh màu chạy. */
+@keyframes shimmer-bg { from { background-position: 0% 0; } to { background-position: 200% 0; } }
+.spin-ring { animation: spin-slow 3.5s linear infinite; }
+.shimmer-bg { animation: shimmer-bg 4s linear infinite; }
 
 /* ---- Con trỏ chuột theo phong cách MarketOS: mũi tên tím viền đậm; chân mèo chỉ hiện trên thanh tiêu đề cửa sổ ---- */
 :root {
