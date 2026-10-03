@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "api:ready": "node scripts/wait-for-api.mjs",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
