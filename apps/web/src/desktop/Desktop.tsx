@@ -17,8 +17,8 @@ import { useSky } from "./use-sky";
 import { WindowLayer } from "./WindowLayer";
 import { useWindowStore } from "./window-store";
 
-export function Desktop() {
-  const sky = useSky();
+export function Desktop({ skyMinutes }: Readonly<{ skyMinutes: number }>) {
+  const sky = useSky(skyMinutes);
   const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const open = useWindowStore((s) => s.open);

@@ -56,6 +56,33 @@ const GULLS = [
   { y: hor * 0.55, sc: 0.6, dur: 56, delay: 9, bob: 4.5 },
 ];
 
+/** Bóng cá mờ dưới nước (không viền, không màu sặc sỡ) để hoà vào biển. `rev`: bơi sang trái. */
+const FISH = [
+  { y: hor + 55, sc: 0.3, dur: 100, delay: 30, rev: false },
+  { y: hor + 70, sc: 0.35, dur: 95, delay: 12, rev: true },
+  { y: hor + 100, sc: 0.42, dur: 88, delay: 60, rev: true },
+  { y: hor + 125, sc: 0.5, dur: 80, delay: 45, rev: false },
+  { y: hor + 132, sc: 0.45, dur: 80, delay: 47, rev: false },
+  { y: hor + 155, sc: 0.55, dur: 74, delay: 20, rev: false },
+  { y: hor + 175, sc: 0.6, dur: 70, delay: 5, rev: true },
+  { y: hor + 195, sc: 0.62, dur: 66, delay: 38, rev: true },
+];
+
+function Fish({ y, sc, dur, delay, rev }: (typeof FISH)[number]) {
+  return (
+    <g transform={`translate(0 ${y})`} opacity={0.22}>
+      <g className={rev ? "walk-l" : "walk-r"} style={anim(dur, delay)}>
+        <g className="bob-s" style={anim(2.6 + sc, delay)}>
+          <g transform={`scale(${rev ? -sc : sc} ${sc})`} fill="#0B4F73">
+            <path className="tail-wag" d="M11 12L0 3Q3 12 0 21z" />
+            <ellipse cx={25} cy={12} rx={15} ry={7.5} />
+          </g>
+        </g>
+      </g>
+    </g>
+  );
+}
+
 /** Chiếu độ cao trên trời (0..hor) xuống mặt biển để đặt bóng. */
 const seaY = (y: number) => hor + 36 + (y / hor) * (seaH - 100);
 
@@ -146,7 +173,7 @@ function Gull({ y, sc, dur, delay, bob }: { y: number; sc: number; dur: number; 
   );
 }
 
-export function BeachScene({ sky }: { sky: Sky }) {
+export function BeachScene({ sky }: Readonly<{ sky: Sky }>) {
   const period = W / 6;
   let top = `M0,14 Q${period / 4},6 ${period / 2},14`;
   for (let k = 2; k <= 12; k++) top += ` T${(period * k) / 2},14`;
@@ -235,6 +262,10 @@ export function BeachScene({ sky }: { sky: Sky }) {
             <ellipse key={i} cx={g.cx} cy={g.cy} rx={g.rx} ry={1.2} fill="#fff" className="glit" style={anim(g.dur, g.delay)} />
           ))}
         </g>
+
+        {FISH.map((f) => (
+          <Fish key={f.y} {...f} />
+        ))}
 
         <Boats />
         <SeaPeople />

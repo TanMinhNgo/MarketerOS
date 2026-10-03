@@ -6,6 +6,7 @@ export type AppIconName =
   | "studio"
   | "calendar"
   | "assistant"
+  | "automations"
   | "plans"
   | "trash"
   | "settings"
@@ -81,6 +82,16 @@ export const apps = [
     defaultSize: { w: 720, h: 640 },
     position: "left",
     component: () => import("./ai-assistant"),
+  },
+  {
+    id: "automations",
+    title: "Automations",
+    description: "Run drafts, scheduling and weekly reports on a schedule, with your review (Max).",
+    icon: "automations",
+    route: "/apps/automations",
+    defaultSize: { w: 720, h: 640 },
+    position: "left",
+    component: () => import("./automations"),
   },
   {
     id: "media-library",

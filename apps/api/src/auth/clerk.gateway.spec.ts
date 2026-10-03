@@ -37,6 +37,29 @@ test('Clerk SDK verifies signatures, expiry and allowed origin without external 
     )}`;
     return `${payload}.${sign('RSA-SHA256', Buffer.from(payload), privateKey).toString('base64url')}`;
   }
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:max', fea: 'u:marketing_automation,u:project_aware_ai_assistant' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'max',
+    features: ['ai_assistant', 'automation'],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'o:max', fea: 'o:marketing_automation' })}`,
+    ),
+  ).resolves.toEqual({
+    clerkId: 'user_local_test',
+    plan: 'free',
+    features: [],
+  });
+  await expect(
+    gateway.authenticate(
+      `Bearer ${token({ pla: 'u:max', fea: 'u:automation' })}`,
+    ),
+  ).resolves.toEqual({ clerkId: 'user_local_test', plan: 'max', features: [] });
   await expect(gateway.authenticate(`Bearer ${token()}`)).resolves.toEqual({
     clerkId: 'user_local_test',
     plan: 'free',

@@ -9,7 +9,7 @@ export class AssistantGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     requireFeature(
-      request.user.plan === 'pro' ? request.user : { features: [] },
+      request.user.plan !== 'free' ? request.user : { features: [] },
       'ai_assistant',
     );
     await this.projects.owned(

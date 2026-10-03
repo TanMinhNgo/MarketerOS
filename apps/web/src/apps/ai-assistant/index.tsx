@@ -1,5 +1,6 @@
 "use client";
 
+import { PLAN_LIMITS } from "@marketos/shared";
 import { FileText, FolderOpen, Lock, Sparkles } from "lucide-react";
 import { AuthGate } from "@/components/auth-gate";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ function AssistantApp() {
         <div className="max-w-sm">
           <Lock className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
           <p className="mt-2 font-semibold">AI Assistant is part of Pro</p>
-          <p className="mt-1 text-muted-foreground">Chat about a project with an assistant that knows its Brand Brief and posts. It suggests drafts, edits, schedules and brief changes you can apply in one click. Pro includes 300 messages a month.</p>
+          <p className="mt-1 text-muted-foreground">Chat about a project with an assistant that knows its Brand Brief and posts. It suggests drafts, edits, schedules and brief changes you can apply in one click. Pro includes {PLAN_LIMITS.pro.assistant} messages a month.</p>
           <Button className="mt-3" onClick={() => open("plans-billing")}><Sparkles /> Upgrade to Pro</Button>
         </div>
       </Message>

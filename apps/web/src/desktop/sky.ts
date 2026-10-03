@@ -1,3 +1,10 @@
+const VN_CLOCK = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", hourCycle: "h23" });
+
+/** Giờ hiện tại theo giờ Việt Nam (UTC+7), tính bằng phút nhưng chỉ đổi theo giờ nguyên. */
+export function vnMinutes(now = new Date()): number {
+  return Number(VN_CLOCK.formatToParts(now).find((p) => p.type === "hour")?.value) * 60;
+}
+
 /** Toạ độ cảnh bãi biển (viewBox cố định 1440x900). */
 export const SCENE = { W: 1440, H: 900, hor: 414, shore: 666 } as const;
 

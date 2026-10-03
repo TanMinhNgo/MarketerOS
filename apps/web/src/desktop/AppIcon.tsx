@@ -74,6 +74,15 @@ const STICKERS: Record<AppIconName, ReactNode> = {
       <Sparkle cx={53} cy={50} r={9} fill="#FFD84D" />
     </>
   ),
+  automations: (
+    <>
+      <circle cx={32} cy={34} r={22} {...stroke("#FFB43A")} />
+      <path d="M32 20v14l9 6" fill="none" stroke={O} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M48 8a22 22 0 0 1 10 12" fill="none" stroke={O} strokeWidth={3} strokeLinecap="round" />
+      <path d="M58 12v8h-8" fill="none" stroke={O} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      <Sparkle cx={12} cy={54} r={7} fill="#FFD84D" />
+    </>
+  ),
   plans: (
     <>
       <rect x={4} y={14} width={56} height={38} rx={8} {...stroke("#3B9CFF")} />

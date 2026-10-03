@@ -20,6 +20,12 @@ npm run dev
 ```
 
 Web: `http://localhost:3000`; API: `http://localhost:3001`.
+`npm run dev` chạy NestJS trước, chờ `/api/health` trả `status: ok`, `db: up`,
+rồi mới khởi động Next.js. Gate chờ tối đa 300 giây; nếu API/DB chưa sẵn sàng,
+Turbo báo lỗi và không khởi động web. Chạy qua Turbo với `--filter=web` cũng giữ gate này.
+Chạy trực tiếp `npm run dev --workspace=web` bỏ qua gate.
+Gate đọc `API_URL` từ env tiến trình hoặc `apps/web/.env.local`; nếu chưa đặt thì dùng
+`http://localhost:3001`, cùng mặc định của Next rewrite. Nếu đổi cổng API, đặt `API_URL` tương ứng.
 API đã có Clerk auth, Projects/Trash, Brand Brief, AI Content Studio qua SSE,
 quota TEXT và API duyệt/lên lịch nội dung. Health public ở `/api/health`, Swagger ở `/docs`.
 Xem [hướng dẫn API](./apps/api/README.md) để cấu hình env, migration và database test riêng.

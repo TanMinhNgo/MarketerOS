@@ -11,7 +11,8 @@ const SHIPPED = [
   "Brand Brief per project",
   "Content Studio: AI writes 3 post variants per request, in the brief's voice and language",
   "Review and approve drafts, then schedule them on the Content Calendar",
-  "Free and Pro plans with usage limits, checkout and billing history",
+  "Free, Pro and Max plans with usage limits, checkout and billing history",
+  "Automations that write drafts, schedule approved posts and send weekly reports (Max)",
   "AI Assistant (Pro): chat per project, with suggested drafts, edits and schedules you apply in one click",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
@@ -25,7 +26,7 @@ const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "Tan
 
 export default function App() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
+    <div className="mx-auto w-11/12 space-y-6 py-6">
       <header className="flex items-center gap-4">
         <Logo size={64} />
         <div>

@@ -13,6 +13,7 @@ import { useWindowStore } from "@/desktop/window-store";
 import { Progress } from "@/components/ui/progress";
 import { errorMessage } from "@/lib/api-client";
 import { keys, useMe, useUsage } from "@/lib/queries";
+import { PLAN_CATALOG, PLAN_LIMITS } from "@marketos/shared";
 import { cn } from "@/lib/utils";
 
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
@@ -55,12 +56,14 @@ function Usage() {
   const { data, isPending, error } = useUsage();
   if (isPending) return <Muted>Loading usage…</Muted>;
   if (error) return <Muted>{errorMessage(error)}</Muted>;
-  const { projects, text, assistant } = data.usage;
+  const { projects, text, assistant, automations, automationRuns } = data.usage;
   return (
     <div className="space-y-4">
       <Meter label="Active projects" used={projects.used} limit={projects.limit} hint="Projects in Trash don't count." />
       <Meter label="AI generations this month" used={text.used} limit={text.limit} hint={`One generation writes 3 variants; every 3 single-variant regenerates count as 1. Resets ${fmt(new Date(data.period.end))}.`} />
       {assistant && <Meter label="AI Assistant messages this month" used={assistant.used} limit={assistant.limit} hint={`Messages you send to the assistant. Resets ${fmt(new Date(data.period.end))}.`} />}
+      {automations && <Meter label="Automations turned on" used={automations.used} limit={automations.limit} hint="Across all projects. Paused automations don't count." />}
+      {automationRuns && <Meter label="Automation runs this month" used={automationRuns.used} limit={automationRuns.limit} hint={`Scheduled runs and Run now, including failed or skipped ones. Resets ${fmt(new Date(data.period.end))}.`} />}
     </div>
   );
 }
@@ -78,7 +81,8 @@ function CurrentPlan() {
   // Gói trả phí đang dùng (nếu có); người dùng Free không có subscription item.
   const item = sub.data?.subscriptionItems.find((i) => i.status === "active" || i.status === "past_due");
   const pro = plans.data.find((p) => p.slug === "pro");
-  const planName = item?.plan.name ?? (me.data?.plan === "pro" ? "Pro" : "Free");
+  const max = plans.data.find((p) => p.slug === "max");
+  const planName = item?.plan.name ?? PLAN_CATALOG[me.data?.plan ?? "free"].name;
   const isPaid = !!item && !item.plan.isDefault;
   const endsAt = item?.canceledAt ? item.periodEnd : null;
   const next = sub.data?.nextPayment ?? item?.nextPayment;
@@ -104,6 +108,9 @@ function CurrentPlan() {
     }
   };
 
+  let proLabel = isPaid ? "Switch to Pro" : "Upgrade to Pro";
+  if (item?.plan.slug === "pro") proLabel = "Resubscribe to Pro";
+
   if (sub.isLoading) return <Muted>Loading your plan…</Muted>;
   if (sub.error) return <Muted>Billing isn&apos;t available yet. Check back soon.</Muted>;
 
@@ -121,13 +128,21 @@ function CurrentPlan() {
 
       {isPaid && !endsAt && next && <Muted>Next payment of {next.amount.amountFormatted} on {fmt(next.date)}.</Muted>}
       {isPaid && endsAt && <Muted>You keep {planName} features until {fmt(endsAt)}; you won&apos;t be charged again.</Muted>}
-      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade for 20 projects, 200 AI generations and the AI Assistant (300 messages) a month.</Muted>}
+      {!isPaid && <Muted>You&apos;re on the Free plan. Upgrade to Pro for {PLAN_LIMITS.pro.projects} projects, {PLAN_LIMITS.pro.text} AI generations and the AI Assistant ({PLAN_LIMITS.pro.assistant} messages) a month, or to Max for Automations too.</Muted>}
+      {isPaid && !endsAt && max && item.plan.slug !== "max" && <Muted>Max adds Automations: drafts, scheduling and weekly reports on a schedule, with your review.</Muted>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {(!isPaid || endsAt) && pro && (
           <CheckoutButton planId={pro.id} planPeriod="month" for="user" onSubscriptionComplete={() => void afterCheckout()}>
             <Button>
-              <Sparkles /> {endsAt ? "Resubscribe to Pro" : "Upgrade to Pro"}
+              <Sparkles /> {proLabel}
+            </Button>
+          </CheckoutButton>
+        )}
+        {max && (item?.plan.slug !== "max" || endsAt) && (
+          <CheckoutButton planId={max.id} planPeriod="month" for="user" onSubscriptionComplete={() => void afterCheckout()}>
+            <Button variant={isPaid ? "default" : "outline"}>
+              <Sparkles /> {item?.plan.slug === "max" ? "Resubscribe to Max" : "Upgrade to Max"}
             </Button>
           </CheckoutButton>
         )}
@@ -248,7 +263,7 @@ function History() {
 
 function BillingApp() {
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-5">
+    <div className="mx-auto w-11/12 space-y-4 py-5">
       <header>
         <h2 className="font-display text-xl font-bold">Plans &amp; Billing</h2>
         <p className="text-sm text-muted-foreground">Manage your subscription, payment method and invoices.</p>

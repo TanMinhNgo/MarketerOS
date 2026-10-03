@@ -1,7 +1,7 @@
 "use client";
 
 import type { BrandBriefResponse } from "@marketos/shared";
-import { Copy, Eraser, SendHorizontal, Sparkles, Square } from "lucide-react";
+import { Copy, Eraser, SendHorizontal, Sparkles, Square, Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -136,6 +136,11 @@ export function Chat({ projectId, projectName, brief }: Readonly<{ projectId: st
           ) : (
             <div key={m.id} className="flex w-2/3 flex-col gap-2 self-start">
               <Bubble mine={false}>
+                {m.automationId && (
+                  <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+                    <Workflow className="size-3" aria-hidden="true" /> From an automation
+                  </p>
+                )}
                 <Markdown text={m.content} />
                 <Button size="xs" variant="ghost" className="mt-1 -ml-2 text-muted-foreground" onClick={() => copyText(m.content)}>
                   <Copy /> Copy

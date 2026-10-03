@@ -32,6 +32,7 @@ enum GenerationStatus {
 }
 
 enum GenerationKind {
+  AUTOMATION
   TEXT
   IMAGE
   ASSISTANT
@@ -111,6 +112,7 @@ model User {
   email           String?
   name            String?
   isDemo          Boolean                 @default(false)
+  billingPlan     String                  @default("free")
   projects        Project[]
   generations     Generation[]
   personalization PersonalizationProfile?
@@ -141,6 +143,7 @@ model Project {
   references         PersonalReference[]
   activities         UserActivity[]
   assistantMessages  AssistantMessage[]
+  automations        Automation[]
 
   @@index([ownerId, deletedAt, createdAt])
 }
@@ -199,6 +202,7 @@ model Generation {
   user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   requestId               String
   assistantMessages       AssistantMessage[]
+  automationRun           AutomationRun?
   input                   Json
   briefSnapshot           Json
   personalizationSnapshot Json?
@@ -232,10 +236,53 @@ model AssistantMessage {
   role         String
   content      String
   actions      Json       @default("[]")
+  automationId String?
+  automation   Automation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now()) @db.Timestamptz(3)
 
   @@unique([generationId, role])
   @@index([projectId, createdAt, id])
+}
+
+model Automation {
+  id                String @id @default(cuid())
+  projectId         String
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name              String
+  type              String
+  enabled           Boolean @default(true)
+  schedule          Json
+  config            Json
+  nextRunAt         DateTime? @db.Timestamptz(3)
+  lastRunAt         DateTime? @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  runs              AutomationRun[]
+  assistantMessages AssistantMessage[]
+  @@index([enabled, nextRunAt])
+  @@index([projectId, createdAt, id])
+}
+
+model AutomationRun {
+  id                   String @id @default(cuid())
+  automationId         String
+  automation           Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  generationId         String? @unique
+  generation           Generation? @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  scheduledFor         DateTime? @db.Timestamptz(3)
+  trigger              String
+  status               String @default("queued")
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  startedAt            DateTime? @db.Timestamptz(3)
+  finishedAt           DateTime? @db.Timestamptz(3)
+  summary              String?
+  createdContentIds    String[] @default([])
+  scheduledContentIds  String[] @default([])
+  assistantMessageId  String?
+  error                Json?
+  @@unique([automationId, scheduledFor])
+  @@index([automationId, createdAt, id])
+  @@index([status, createdAt])
 }
 
 model Campaign {

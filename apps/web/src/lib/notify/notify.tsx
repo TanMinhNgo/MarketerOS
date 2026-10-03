@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
+import { ApiError, errorMessage } from "@/lib/api-client";
 import { ToastCard, type NotifyAction } from "@/components/toast-card";
 import { useWindowStore } from "@/desktop/window-store";
 import { useNotifications, type NotifyKind } from "./notification-store";
@@ -42,3 +43,10 @@ notify.info = by("info");
 notify.warning = by("warning");
 notify.error = by("error");
 notify.reminder = by("reminder");
+
+/** Toast cho lỗi API: hết lượt / cần nâng gói / chạm giới hạn là cảnh báo kèm nút xem gói, còn lại là lỗi. */
+notify.apiError = (title: string, e: unknown) => {
+  const limit = e instanceof ApiError && ["QUOTA_EXCEEDED", "PLAN_LIMIT", "PLAN_REQUIRED"].includes(e.code);
+  if (limit) notify.warning(title, { description: errorMessage(e), action: { label: "See plans", appId: "plans-billing" } });
+  else notify.error(title, { description: errorMessage(e) });
+};

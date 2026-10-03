@@ -1,10 +1,20 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Test chạy trên Node (không có localStorage); persist đọc storage lúc tạo store nên phải có trước khi import.
+vi.hoisted(() => {
+  const m = new Map<string, string>();
+  globalThis.localStorage = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), clear: () => m.clear() } as unknown as Storage;
+});
+
 import { initialWindowState, MIN_H, MIN_W, selectFocusedId, useWindowStore } from "./window-store";
 
 const s = () => useWindowStore.getState();
 const win = (id: string) => s().windows.find((w) => w.id === id)!;
 
-beforeEach(() => useWindowStore.setState({ ...initialWindowState, windows: [] }));
+beforeEach(() => {
+  localStorage.clear();
+  useWindowStore.setState({ ...initialWindowState, windows: [] });
+});
 
 describe("open", () => {
   it("mở app mới to hơn kích thước mặc định của registry (×1.25)", () => {
@@ -128,5 +138,16 @@ describe("move / resize / area", () => {
     const w = win("trash");
     expect(w.x + w.w).toBeLessThanOrEqual(900);
     expect(w.y + w.h).toBeLessThanOrEqual(500);
+  });
+});
+
+describe("persist", () => {
+  it("F5 khôi phục mọi cửa sổ đã lưu (giữ thu nhỏ, z), bỏ app không còn trong registry", async () => {
+    const w = (appId: string, z: number, minimized = false) => ({ id: appId, appId, x: 10, y: 10, w: 500, h: 400, z, minimized, maximized: false });
+    localStorage.setItem("marketos.windows.v1", JSON.stringify({ state: { windows: [w("projects", 1), w("trash", 3, true), w("gone-app", 2)], topZ: 3 }, version: 0 }));
+    await useWindowStore.persist.rehydrate();
+    expect(s().windows.map((x) => x.id)).toEqual(["projects", "trash"]);
+    expect(win("trash")).toMatchObject({ minimized: true, z: 3 });
+    expect(s().topZ).toBe(3);
   });
 });

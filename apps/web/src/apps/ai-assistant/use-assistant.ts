@@ -4,6 +4,7 @@ import type { AssistantAction, AssistantMessage, AssistantMessagesResponse } fro
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyAction, clearMessages, fetchMessages, markAction, sendMessage } from "@/lib/assistant-api";
+import { notify } from "@/lib/notify/notify";
 import { keys } from "@/lib/queries";
 
 type History = InfiniteData<AssistantMessagesResponse, string | undefined>;
@@ -42,7 +43,10 @@ export function useAssistant(projectId: string) {
         const done = await sendMessage(projectId, content, { signal: controller.signal, onDelta: (t) => setPending((p) => p && { ...p, reply: p.reply + t }) });
         qc.setQueryData<History>(key, (d) => d && { ...d, pages: d.pages.map((p, i) => (i === 0 ? { ...p, items: [done.assistantMessage, done.userMessage, ...p.items] } : p)) });
       } catch (e) {
-        if (!(controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError"))) setError(e);
+        if (!(controller.signal.aborted || (e instanceof DOMException && e.name === "AbortError"))) {
+          setError(e);
+          notify.apiError("The assistant couldn't reply", e);
+        }
         // Tin của người dùng vẫn được lưu ở server khi lỗi/huỷ: tải lại để lịch sử khớp.
         void qc.invalidateQueries({ queryKey: key });
       } finally {
@@ -60,11 +64,21 @@ export function useAssistant(projectId: string) {
       abort.current?.abort();
       await clearMessages(projectId);
     },
-    onSuccess: () => qc.resetQueries({ queryKey: key }),
+    onSuccess: () => {
+      notify.success("Chat cleared");
+      return qc.resetQueries({ queryKey: key });
+    },
   });
 
   return { history, messages, pending, error, send, stop, clear, isSending: !!pending };
 }
+
+const APPLIED: Record<AssistantAction["type"], Parameters<typeof notify.success>> = {
+  create_draft: ["Draft saved", { description: "It's in Needs review.", action: { label: "Open Content Studio", appId: "content-studio" } }],
+  edit_content: ["Post updated", { action: { label: "Open Content Studio", appId: "content-studio" } }],
+  schedule: ["Post scheduled", { action: { label: "Open calendar", appId: "content-calendar" } }],
+  update_brief: ["Brand Brief updated", { action: { label: "Open Brand Brief", appId: "brand-brief" } }],
+};
 
 /** Hành động đã chạy nhưng không lưu được nhãn `applied`: không cho bấm Apply lại (tránh tạo trùng). */
 export class AppliedButNotMarked extends Error {}
@@ -84,12 +98,18 @@ export function useActionStatus(projectId: string, messageId: string) {
         throw e;
       }
     },
-    onSuccess: (message, { status }) => {
+    onSuccess: (message, { action, status }) => {
       qc.setQueryData<History>(assistantKey(projectId), (d) => replaceMessage(d, message));
-      if (status === "applied") refreshTargets();
+      if (status === "applied") {
+        refreshTargets();
+        notify.success(...APPLIED[action.type]);
+      }
     },
     onError: (e) => {
-      if (e instanceof AppliedButNotMarked) refreshTargets();
+      if (e instanceof AppliedButNotMarked) {
+        refreshTargets();
+        notify.warning("Applied, but not marked", { description: e.message });
+      } else notify.apiError("Couldn't apply the suggestion", e);
     },
   });
 }

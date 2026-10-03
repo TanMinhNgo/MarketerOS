@@ -30,6 +30,7 @@ const EnvironmentSchema = z
       .or(z.literal('')),
     OPENAI_API_KEY: z.string().trim().min(1),
     AI_MODEL: z.string().trim().min(1),
+    REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
   })
   .superRefine((env, context) => {
     if (

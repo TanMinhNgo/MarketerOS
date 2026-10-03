@@ -33,6 +33,7 @@ const CLERK_FEATURE_SLUGS: Record<FeatureKey, readonly string[]> = {
   channel_publishing: ['channel_connections_and_scheduled_publishing'],
   ai_assistant: ['project_aware_ai_assistant'],
   content_analytics: ['content_performance_analytics'],
+  automation: ['marketing_automation'],
 };
 
 @Injectable()
@@ -67,7 +68,9 @@ export class ClerkGateway {
     )
       throw new UnauthorizedException();
     // MarketOS bills individual users, not an active Clerk organization.
-    const plan: PlanKey = auth.has({ plan: 'u:pro' }) ? 'pro' : 'free';
+    let plan: PlanKey = 'free';
+    if (auth.has({ plan: 'u:max' })) plan = 'max';
+    else if (auth.has({ plan: 'u:pro' })) plan = 'pro';
     return {
       clerkId: auth.userId,
       plan,
@@ -94,5 +97,22 @@ export class ClerkGateway {
     } catch {
       throw new ServiceUnavailableException();
     }
+  }
+
+  // Worker has no session JWT: refresh the individual user's subscription from Clerk.
+  async automationEntitled(clerkId: string): Promise<boolean> {
+    const subscription =
+      await this.client().billing.getUserBillingSubscription(clerkId);
+    const now = Date.now();
+    return subscription.subscriptionItems.some(
+      (item) =>
+        item.plan?.slug === 'max' &&
+        ['active', 'canceled'].includes(item.status) &&
+        (item.periodEnd === null || item.periodEnd > now) &&
+        item.endedAt === null &&
+        item.plan.features.some(
+          (feature) => feature.slug === 'marketing_automation',
+        ),
+    );
   }
 }
