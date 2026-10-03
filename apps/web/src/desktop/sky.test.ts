@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSky, SCENE } from "./sky";
+import { computeSky, SCENE, vnMinutes } from "./sky";
 
 describe("computeSky", () => {
   it("ban ngày: mặt trời trên đường chân trời, trời sáng, không sao", () => {
@@ -37,5 +37,12 @@ describe("computeSky", () => {
   it("giờ ngoài khoảng 0–24 được chuẩn hoá", () => {
     expect(computeSky(25).top).toBe(computeSky(1).top);
     expect(computeSky(-2).top).toBe(computeSky(22).top);
+  });
+});
+
+describe("vnMinutes", () => {
+  it("lấy giờ nguyên theo giờ Việt Nam (UTC+7), không theo múi giờ máy", () => {
+    expect(vnMinutes(new Date("2026-10-03T10:24:00Z"))).toBe(17 * 60);
+    expect(vnMinutes(new Date("2026-10-03T17:05:00Z"))).toBe(0);
   });
 });
