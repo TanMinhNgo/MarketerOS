@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { findApp } from "../apps/registry";
 import { loadLayout } from "./layout-storage";
 
@@ -53,7 +54,7 @@ const patch = (list: WindowState[], id: string, p: Partial<WindowState>) => list
 export const initialWindowState = { windows: [] as WindowState[], topZ: 0, area: { w: 1440, h: 800 } };
 
 const createWindowStore = () =>
-  create<WindowStore>()((set) => ({
+  create<WindowStore>()(persist((set) => ({
   ...initialWindowState,
 
   open: (appId) =>
@@ -122,6 +123,16 @@ const createWindowStore = () =>
       const area = { w, h };
       return { area, windows: s.windows.map((win) => (win.maximized ? win : { ...win, ...fitRect(win, area) })) };
     }),
+}), {
+  // Giữ các cửa sổ đang mở qua F5. Hydrate thủ công (useUrlSync) để render đầu khớp HTML server.
+  name: "marketos.windows.v1",
+  storage: createJSONStorage(() => localStorage),
+  skipHydration: true,
+  partialize: (s) => ({ windows: s.windows, topZ: s.topZ }),
+  merge: (saved, current) => {
+    const p = saved as Partial<Pick<WindowStore, "windows" | "topZ">> | undefined;
+    return { ...current, topZ: p?.topZ ?? current.topZ, windows: (p?.windows ?? []).filter((w) => findApp(w.appId)) };
+  },
 }));
 
 const globalForStore = globalThis as unknown as { __marketosWindowStore?: ReturnType<typeof createWindowStore> };

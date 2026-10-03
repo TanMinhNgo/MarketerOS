@@ -20,6 +20,10 @@ export function useUrlSync() {
   const pathRef = useRef(pathname);
   const prevFocused = useRef<string | null | undefined>(undefined);
 
+  // Khôi phục cửa sổ của phiên trước, trước khi URL -> store mở app trên URL lên trên cùng.
+  // `persist` không có khi trình duyệt chặn localStorage: khi đó chỉ không khôi phục.
+  useEffect(() => void useWindowStore.persist?.rehydrate(), []);
+
   useEffect(() => {
     pathRef.current = pathname;
     const st = useWindowStore.getState();
