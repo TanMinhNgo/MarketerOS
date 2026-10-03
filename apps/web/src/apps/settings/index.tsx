@@ -54,8 +54,8 @@ function WindowLayout() {
     // Mở lại các cửa sổ đang mở (theo thứ tự chồng) để chúng về kích thước và vị trí mặc định.
     const { windows, close, open } = useWindowStore.getState();
     const ids = [...windows].sort((a, b) => a.z - b.z).map((w) => w.appId);
-    ids.forEach(close);
-    ids.forEach(open);
+    for (const id of ids) close(id);
+    for (const id of ids) open(id);
     setConfirming(false);
     notify.success("Window layout reset", { description: "Every window is back to its default size and place." });
   };

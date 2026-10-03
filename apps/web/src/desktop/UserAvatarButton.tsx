@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import type { PlanKey } from "@marketos/shared";
+import { PLAN_CATALOG, type PlanKey } from "@marketos/shared";
 import { Crown, Sparkles } from "lucide-react";
 import { useMe } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export function UserAvatarButton() {
       {plan === "max" && <span className="spin-ring absolute inset-[-50%] bg-[conic-gradient(#FF6F9C,#FFC83D,#4ADE80,#38BDF8,#A78BFA,#FF6F9C)]" aria-hidden="true" />}
       <button
         type="button"
-        aria-label={plan === "free" ? "Open account" : `Open account (${plan === "pro" ? "Pro" : "Max"} plan)`}
+        aria-label={plan === "free" ? "Open account" : `Open account (${PLAN_CATALOG[plan].name} plan)`}
         onClick={() => open("account")}
         className="relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[#3B2A4A] bg-white/70 text-[11px] font-bold text-[#3B2A4A] shadow-[0_2px_0_rgba(59,42,74,0.3)] transition-transform hover:scale-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
       >

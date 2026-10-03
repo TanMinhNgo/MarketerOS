@@ -128,7 +128,7 @@ function Overview({ s }: Readonly<{ s: ContentSummary }>) {
 
       <Card icon={TrendingUp} title="Content performance">
         <p className="text-sm text-muted-foreground">
-          <span className="mr-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">Coming soon</span>
+          <span className="mr-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">Coming soon</span>{" "}
           Views, clicks and engagement per post will appear here once you can connect your channels in Integrations.
         </p>
       </Card>
