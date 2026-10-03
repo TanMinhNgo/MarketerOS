@@ -173,7 +173,7 @@ function Gull({ y, sc, dur, delay, bob }: { y: number; sc: number; dur: number; 
   );
 }
 
-export function BeachScene({ sky }: { sky: Sky }) {
+export function BeachScene({ sky }: Readonly<{ sky: Sky }>) {
   const period = W / 6;
   let top = `M0,14 Q${period / 4},6 ${period / 2},14`;
   for (let k = 2; k <= 12; k++) top += ` T${(period * k) / 2},14`;

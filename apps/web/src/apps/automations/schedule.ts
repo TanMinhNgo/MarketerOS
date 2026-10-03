@@ -13,17 +13,16 @@ export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SUFFIX: Record<string, string> = { one: "st", two: "nd", few: "rd", other: "th" };
 const ordinal = (n: number) => `${n}${SUFFIX[new Intl.PluralRules("en-US", { type: "ordinal" }).select(n)]}`;
 
+function when(s: AutomationSchedule): string {
+  if (s.frequency === "monthly") return `Monthly on the ${ordinal(s.dayOfMonth)}`;
+  if (s.frequency === "daily" || s.weekdays.length === 7) return "Every day";
+  const days = [...s.weekdays].sort((a, b) => a - b).map((d) => WEEKDAYS[d]);
+  return `Every ${days.join(", ")}`;
+}
+
 /** Lịch dạng chữ, vd. "Every Mon, Thu at 09:00 (Asia/Ho_Chi_Minh)". */
 export function describeSchedule(s: AutomationSchedule): string {
-  const when =
-    s.frequency === "daily"
-      ? "Every day"
-      : s.frequency === "weekly"
-        ? s.weekdays.length === 7
-          ? "Every day"
-          : `Every ${[...s.weekdays].sort((a, b) => a - b).map((d) => WEEKDAYS[d]).join(", ")}`
-        : `Monthly on the ${ordinal(s.dayOfMonth)}`;
-  return `${when} at ${s.time} (${s.timezone})`;
+  return `${when(s)} at ${s.time} (${s.timezone})`;
 }
 
 export const deviceTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;

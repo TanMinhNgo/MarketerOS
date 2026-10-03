@@ -86,7 +86,7 @@ function AutomationCard({ projectId, automation: a, onEdit }: Readonly<{ project
         </div>
         <label className="flex shrink-0 items-center gap-1.5 text-sm font-medium">
           <input type="checkbox" role="switch" className="size-4 accent-primary" checked={a.enabled} disabled={toggle.isPending} onChange={(e) => toggle.mutate({ id: a.id, input: { enabled: e.target.checked } }, { onError: (e) => notify.apiError("Couldn't change the automation", e), onSuccess: (x) => notify.success(x.enabled ? `"${x.name}" is on` : `"${x.name}" is paused`, { description: x.enabled ? describeSchedule(x.schedule) : "It won't run until you turn it back on." }) })} />
-          On
+          <span>On</span>
         </label>
       </header>
 

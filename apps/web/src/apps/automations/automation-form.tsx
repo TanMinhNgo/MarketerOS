@@ -67,6 +67,7 @@ function TimezonePicker({ id, value, onChange }: Readonly<{ id: string; value: s
           role="combobox"
           aria-expanded={open}
           aria-controls={`${id}-list`}
+          aria-activedescendant={open && matches[active] ? `${id}-opt-${active}` : undefined}
           autoComplete="off"
           value={value}
           placeholder="Type to search, e.g. Ho_Chi_Minh"
@@ -105,8 +106,11 @@ function TimezonePicker({ id, value, onChange }: Readonly<{ id: string; value: s
                 key={z}
                 role="option"
                 aria-selected={i === active}
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => pick(z)}
+                id={`${id}-opt-${i}`}
+                onPointerDown={(e) => {
+                  e.preventDefault(); // giữ focus ở ô nhập
+                  pick(z);
+                }}
                 onPointerEnter={() => setActive(i)}
                 className={cn("cursor-pointer rounded-sm px-2 py-1.5 text-sm", i === active && "bg-accent text-accent-foreground", z === value && "font-semibold")}
               >
@@ -120,6 +124,39 @@ function TimezonePicker({ id, value, onChange }: Readonly<{ id: string; value: s
   );
 }
 
+type ConfigFields = { channels: ChannelValue[]; count: number; topic: string; times: string[]; daysAhead: number; prompt: string };
+
+function buildSchedule(frequency: Frequency, time: string, timezone: string, weekdays: number[], dayOfMonth: number): AutomationSchedule {
+  switch (frequency) {
+    case "daily":
+      return { frequency, time, timezone };
+    case "weekly":
+      return { frequency, time, timezone, weekdays };
+    case "monthly":
+      return { frequency, time, timezone, dayOfMonth };
+  }
+}
+
+/** Chỉ gửi các trường của đúng loại tác vụ (schema strict). */
+function buildConfig(type: Type, f: ConfigFields) {
+  switch (type) {
+    case "write_posts":
+      return { channels: f.channels, count: f.count, topic: f.topic };
+    case "schedule_ready":
+      return { times: f.times, daysAhead: f.daysAhead, ...(f.channels.length ? { channels: f.channels } : {}) };
+    case "custom_prompt":
+      return { prompt: f.prompt };
+    case "weekly_report":
+      return {};
+  }
+}
+
+/** Tác vụ mới mặc định Facebook; khi sửa thì lấy kênh đã lưu (schedule_ready không lọc kênh = rỗng). */
+function initialChannels(a?: Automation): ChannelValue[] {
+  if (!a) return ["FACEBOOK"];
+  return "channels" in a && a.channels ? a.channels : [];
+}
+
 /** Tạo / sửa tác vụ. Loại tác vụ không đổi được sau khi tạo (theo contract). */
 export function AutomationForm({ projectId, automation, onClose }: Readonly<{ projectId: string; automation?: Automation; onClose: () => void }>) {
   const a = automation;
@@ -131,7 +168,7 @@ export function AutomationForm({ projectId, automation, onClose }: Readonly<{ pr
   const [weekdays, setWeekdays] = useState<number[]>(s?.frequency === "weekly" ? s.weekdays : [1]);
   const [dayOfMonth, setDayOfMonth] = useState(s?.frequency === "monthly" ? s.dayOfMonth : 1);
   const [timezone, setTimezone] = useState(s?.timezone ?? deviceTimezone());
-  const [channels, setChannels] = useState<ChannelValue[]>(a && "channels" in a && a.channels ? a.channels : a ? [] : ["FACEBOOK"]);
+  const [channels, setChannels] = useState<ChannelValue[]>(initialChannels(a));
   const [count, setCount] = useState(a?.type === "write_posts" ? a.count : 3);
   const [topic, setTopic] = useState(a?.type === "write_posts" ? (a.topic ?? "") : "");
   const [times, setTimes] = useState<string[]>(a?.type === "schedule_ready" ? a.times : ["09:00"]);
@@ -141,16 +178,10 @@ export function AutomationForm({ projectId, automation, onClose }: Readonly<{ pr
   const [invalid, setInvalid] = useState(false);
   const save = useSaveAutomation(projectId);
 
-  const schedule: AutomationSchedule =
-    frequency === "daily" ? { frequency, time, timezone } : frequency === "weekly" ? { frequency, time, timezone, weekdays } : { frequency, time, timezone, dayOfMonth };
-  const config =
-    type === "write_posts"
-      ? { channels, count, topic }
-      : type === "schedule_ready"
-        ? { times, daysAhead, ...(channels.length ? { channels } : {}) }
-        : type === "custom_prompt"
-          ? { prompt }
-          : {};
+  const schedule = buildSchedule(frequency, time, timezone, weekdays, dayOfMonth);
+  const config = buildConfig(type, { channels, count, topic, times, daysAhead, prompt });
+  let submitLabel = a ? "Save" : "Create";
+  if (save.isPending) submitLabel = "Saving…";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,7 +308,7 @@ export function AutomationForm({ projectId, automation, onClose }: Readonly<{ pr
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : a ? "Save" : "Create"}</Button>
+            <Button type="submit" disabled={save.isPending}>{submitLabel}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

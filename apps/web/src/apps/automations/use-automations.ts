@@ -62,18 +62,19 @@ export function useRunNow(projectId: string, id: string) {
   });
 }
 
+/** Nút trong toast: mở nơi lần chạy đã thay đổi. */
+function runAction(r: AutomationRun) {
+  if (r.createdContentIds.length) return { label: "Review drafts", appId: "content-studio" };
+  if (r.scheduledContentIds.length) return { label: "Open calendar", appId: "content-calendar" };
+  if (r.assistantMessageId) return { label: "Open chat", appId: "ai-assistant" };
+  return undefined;
+}
+
 function notifyRun(r: AutomationRun) {
   const opts = { description: r.summary ?? undefined, persist: true, os: true, appId: "automations" };
   if (r.status === "failed") return notify.error("Automation run failed", { ...opts, description: r.error?.message ?? opts.description });
   if (r.status === "skipped") return notify.warning("Automation run skipped", opts);
-  const action = r.createdContentIds.length
-    ? { label: "Review drafts", appId: "content-studio" }
-    : r.scheduledContentIds.length
-      ? { label: "Open calendar", appId: "content-calendar" }
-      : r.assistantMessageId
-        ? { label: "Open chat", appId: "ai-assistant" }
-        : undefined;
-  notify.success("Automation run finished", { ...opts, action });
+  notify.success("Automation run finished", { ...opts, action: runAction(r) });
 }
 
 /** Lịch sử chạy, mới nhất trước. Còn lần đang chờ/chạy thì poll 5 giây (backend chưa có realtime). */

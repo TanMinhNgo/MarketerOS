@@ -108,6 +108,9 @@ function CurrentPlan() {
     }
   };
 
+  let proLabel = isPaid ? "Switch to Pro" : "Upgrade to Pro";
+  if (item?.plan.slug === "pro") proLabel = "Resubscribe to Pro";
+
   if (sub.isLoading) return <Muted>Loading your plan…</Muted>;
   if (sub.error) return <Muted>Billing isn&apos;t available yet. Check back soon.</Muted>;
 
@@ -132,7 +135,7 @@ function CurrentPlan() {
         {(!isPaid || endsAt) && pro && (
           <CheckoutButton planId={pro.id} planPeriod="month" for="user" onSubscriptionComplete={() => void afterCheckout()}>
             <Button>
-              <Sparkles /> {item?.plan.slug === "pro" ? "Resubscribe to Pro" : isPaid ? "Switch to Pro" : "Upgrade to Pro"}
+              <Sparkles /> {proLabel}
             </Button>
           </CheckoutButton>
         )}
