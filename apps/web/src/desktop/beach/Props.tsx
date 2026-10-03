@@ -160,6 +160,30 @@ export function Boats() {
           <circle cx={29} cy={33} r={3} fill="#38BDF8" />
         </>
       ))}
+      {/* tàu kéo lưới: cần cẩu thả lưới xuống nước */}
+      {at(0.2, 0.9, 330, 230, (
+        <>
+          <path d="M0 40H72L62 54H8Z" {...st("#D64545")} />
+          <path d="M4 44H68" stroke="#fff" strokeWidth={2} opacity={0.8} />
+          <rect x={10} y={24} width={20} height={16} rx={2} {...st("#fff", 1.6)} />
+          <rect x={14} y={28} width={5} height={5} fill="#38BDF8" />
+          <path d="M48 40V12M48 14L70 34" stroke={O} strokeWidth={2} strokeLinecap="round" />
+          <path d="M70 34V50" stroke={O} strokeWidth={1.2} strokeDasharray="2 2" />
+          <path d="M64 50H76L74 56H66Z" fill="#8FB8C9" opacity={0.7} />
+        </>
+      ))}
+      {/* thuyền gỗ nhỏ có người câu */}
+      {at(0.4, 1.1, 390, 20, (
+        <>
+          <path d="M2 42Q34 50 64 42L56 52H10Z" {...st("#A9744A")} />
+          <path d="M8 45H58" stroke={O} strokeWidth={1.2} opacity={0.4} />
+          <circle cx={30} cy={28} r={5} {...st("#FFE3C7", 1.6)} />
+          <path d="M24 26Q30 18 36 26z" {...st("#F5D06B", 1.6)} />
+          <path d="M26 33H34V42H26Z" {...st("#3B82F6", 1.6)} />
+          <path d="M34 34L58 14" stroke={O} strokeWidth={1.6} strokeLinecap="round" />
+          <path d="M58 14Q62 30 60 48" fill="none" stroke={O} strokeWidth={0.8} opacity={0.7} />
+        </>
+      ))}
     </>
   );
 }

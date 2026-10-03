@@ -138,6 +138,7 @@
 .frond { animation: frond 2.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }
 .bob-s { animation: bob-s 2.6s ease-in-out infinite alternate; }
 .swim-drift { animation: swim-drift 9s ease-in-out infinite alternate; }
+.tail-wag { animation: swim-arm 0.45s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 100% 50%; }
 .icon-bob { animation: icon-bob 4.5s ease-in-out infinite; }
 
 /* ---- Con trỏ chuột theo phong cách MarketOS: mũi tên tím viền đậm; chân mèo chỉ hiện trên thanh tiêu đề cửa sổ ---- */
