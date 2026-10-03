@@ -292,6 +292,47 @@ export const SECTIONS: DocSection[] = [
     ),
   },
   {
+    id: "reports",
+    title: "Reports",
+    summary: "See where a project's posts stand and what's coming up.",
+    body: (
+      <>
+        <P>Reports shows the <strong>selected project</strong>. It counts every saved post, so it always matches Content Studio and the calendar.</P>
+        <Table
+          head={["Section", "What it shows"]}
+          rows={[
+            ["Tiles", "All posts, Needs review, Approved with no date, Scheduled ahead and Done. Click a tile to open where you act on it."],
+            ["Posts by channel", "How many posts each channel has, split by status."],
+            ["Next 4 weeks", "Scheduled posts per week, starting Monday. Empty weeks are flagged so you can fill them."],
+            ["AI usage this month", "Generations, AI Assistant messages and automation runs, across all projects."],
+            ["Export CSV", "Downloads every post of the project (title, channel, status, dates, text, hashtags, call to action) as a CSV file that opens in Excel or Google Sheets."],
+          ]}
+        />
+        <Callout kind="note">Views, clicks and engagement per post will come once channels can be connected in Integrations.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "settings",
+    title: "Settings",
+    summary: "Beach scene, animations, notifications and window layout.",
+    body: (
+      <>
+        <Table
+          head={["Setting", "What it does"]}
+          rows={[
+            ["Beach scene", "Follow the clock (the sky changes through the day), or keep sunrise, daytime, sunset or night."],
+            ["Scene clock", "Which clock the sky follows: Vietnam time or your device's time zone."],
+            ["Animations", "Follow your device's reduce-motion setting, always reduce motion, or always show it."],
+            ["Notifications", "Desktop notifications and posting reminders (the same switches as in the bell)."],
+            ["Reset window layout", "Forgets where you put each window and how big it is, and puts open windows back in their default place."],
+          ]}
+        />
+        <Callout kind="note">Settings are saved in this browser, so another device keeps its own.</Callout>
+      </>
+    ),
+  },
+  {
     id: "trash",
     title: "Trash",
     summary: "Restore projects you removed.",
