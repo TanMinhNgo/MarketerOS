@@ -23,6 +23,7 @@ export class OpenAiService {
       output: Output.object({ schema: AssistantProviderOutputSchema }),
       maxOutputTokens: 8000,
       abortSignal,
+      maxRetries: 0,
     });
   }
 
@@ -47,6 +48,7 @@ export class OpenAiService {
       }),
       maxOutputTokens: 12000,
       abortSignal,
+      maxRetries: 0,
     });
   }
 }

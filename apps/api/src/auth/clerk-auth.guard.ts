@@ -46,6 +46,11 @@ export class ClerkAuthGuard implements CanActivate {
         principal.clerkId,
         await this.clerk.profile(principal.clerkId),
       ));
+    await this.users.syncPlan(
+      user.id,
+      principal.plan,
+      principal.features.includes('automation'),
+    );
     request.user = {
       ...user,
       plan: principal.plan,

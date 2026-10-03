@@ -19,5 +19,6 @@ import { AssistantGuard } from './assistant.guard';
     OpenAiService,
     QuotaService,
   ],
+  exports: [AssistantService],
 })
 export class AssistantModule {}

@@ -148,6 +148,39 @@ export class AssistantService {
     }
   }
 
+  // Automation owns its reservation/persistence; reuse the same prompt, validator and one repair.
+  async automationReply(
+    context: PreparedAssistant['context'],
+    projectId: string,
+    userId: string,
+    signal: AbortSignal,
+    instructions?: { system: string; prompt: string },
+  ) {
+    const prompts = this.prompts.build(context);
+    const prepared = {
+      context,
+      projectId,
+      userId,
+      system: prompts.system + (instructions ? '\n' + instructions.system : ''),
+      prompt: prompts.prompt + (instructions ? '\n' + instructions.prompt : ''),
+    };
+    const state: StreamState = {
+      tokensIn: null,
+      tokensOut: null,
+      measured: false,
+    };
+    const generator = this.generateReply(prepared, signal, state);
+    let step = await generator.next();
+    while (!step.done) step = await generator.next();
+    if (!step.value || signal.aborted)
+      throw new Error('Incomplete automation reply');
+    return {
+      ...step.value,
+      tokensIn: state.tokensIn,
+      tokensOut: state.tokensOut,
+    };
+  }
+
   private async *generateReply(
     prepared: PreparedAssistant,
     signal: AbortSignal,

@@ -33,6 +33,7 @@ import {
 import { apiSchema } from '../common/api-schema';
 import { UsersRepository } from '../users/users.repository';
 import { Public } from './auth.decorators';
+import { ClerkGateway } from './clerk.gateway';
 
 const eventSchema = z.object({ type: z.string().min(1), data: z.unknown() });
 const deletedUserSchema = z.object({ id: z.string().min(1).max(256) });
@@ -45,6 +46,7 @@ export class ClerkWebhookController {
   constructor(
     private readonly config: ConfigService,
     private readonly users: UsersRepository,
+    private readonly clerk: ClerkGateway,
   ) {}
 
   @Post()
@@ -100,6 +102,26 @@ export class ClerkWebhookController {
       const user = deletedUserSchema.safeParse(event.data.data);
       if (!user.success) throw new BadRequestException();
       await this.users.delete(user.data.id);
+    }
+    if (/^subscription(?:Item)?\./.test(event.data.type)) {
+      const data = z
+        .object({
+          payer: z.object({ user_id: z.string().min(1) }).passthrough(),
+        })
+        .passthrough()
+        .safeParse(event.data.data);
+      if (!data.success) throw new BadRequestException();
+      const user = await this.users.find(data.data.payer.user_id);
+      if (user) {
+        // Do not trust event ordering or an event's cached plan: query current Clerk state.
+        let entitled: boolean;
+        try {
+          entitled = await this.clerk.automationEntitled(user.clerkId);
+        } catch {
+          throw new ServiceUnavailableException();
+        }
+        if (!entitled) await this.users.syncPlan(user.id, 'free', false);
+      }
     }
     // deleteMany is idempotent: retries and already-absent users need no event table.
     return { received: true };

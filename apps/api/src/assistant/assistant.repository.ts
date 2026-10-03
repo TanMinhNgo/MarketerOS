@@ -20,6 +20,7 @@ const select = {
   content: true,
   actions: true,
   createdAt: true,
+  automationId: true,
 } as const;
 const conflict = () =>
   new ConflictException({
@@ -100,7 +101,11 @@ export class AssistantRepository {
       const now = new Date();
       const { start, end } = this.quota.period(now);
       const used = await readAssistantUsage(tx, userId, start, end);
-      const limit = PLAN_LIMITS.pro.assistant;
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      const limit =
+        user.billingPlan === 'max'
+          ? PLAN_LIMITS.max.assistant
+          : PLAN_LIMITS.pro.assistant;
       if (used >= limit)
         throw new HttpException(
           {

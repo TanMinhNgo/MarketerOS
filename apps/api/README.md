@@ -1,5 +1,56 @@
 # MarketOS API
 
+## Phase 8: Automations + Max (03/10/2026)
+
+Đã triển khai API automations, quota Max và worker độc lập. Contract hiện tại,
+request/response, mã lỗi và các quyết định chi tiết nằm ở
+[`CONTRACT-CHANGES.md`](../../packages/docs/CONTRACT-CHANGES.md).
+Các phần bên dưới ghi lại những phase trước; giới hạn/quyền Phase 8 thay thế mô tả cũ.
+
+Max: 50 projects, 500 TEXT, 1000 assistant, 10 automations enabled trên toàn tài khoản,
+60 automation runs/tháng UTC. Clerk vẫn quyết định quyền: plan `max` và feature
+`marketing_automation` phải tồn tại trong catalog thật. Hiện catalog local chỉ xác minh
+Free/Pro; mapping Max trong code chưa chứng minh đã tạo plan/checkout trên Clerk.
+
+HTTP và worker chạy bằng hai tiến trình riêng, worker không mở HTTP port:
+
+```powershell
+docker compose --profile jobs up -d postgres redis
+npm run build --workspace @marketos/shared
+npm run db:deploy --workspace api
+npm run build --workspace api
+# Terminal 1:
+npm run dev --workspace api
+# Terminal 2: đặt REDIS_URL=redis://localhost:6380 trong apps/api/.env trước khi chạy.
+npm run worker --workspace api
+```
+
+HTTP không yêu cầu Redis; Run now ghi queued vào PostgreSQL trước và trả 202.
+Nếu worker chưa chạy, run giữ queued cho tới khi worker dispatch vào BullMQ.
+Worker cần DATABASE_URL, REDIS_URL, Clerk keys, OPENAI_API_KEY và AI_MODEL phía server.
+Sau khi sửa code worker phải build lại rồi restart tiến trình worker.
+Redis dev dùng AOF, volume riêng và noeviction; không xoá volume để restart worker.
+
+write_posts chỉ tạo DRAFT; schedule_ready chỉ lên lịch READY chưa có lịch và không
+chiếm giờ đã có bài. weekly_report ghi tin assistant; custom_prompt chỉ tự áp dụng
+create_draft, các action khác giữ proposed. Pause/downgrade huỷ queued, không hoàn
+quota; failed/skipped đã reservation vẫn tính lượt. Nâng Max lại cần bật thủ công.
+Worker claim bằng DB lock, không gọi model lại cho run đã running; stale running
+quá 5 phút thành failed. Không tự duyệt, xoá, đánh dấu Done hay sửa billing.
+
+Clerk webhook cần subscribe `subscription.*` và `subscriptionItem.*` phù hợp trong
+Dashboard, ngoài `user.deleted`; endpoint giữ verify Svix và kiểm trạng thái Clerk
+hiện tại trước khi pause. Cần tự xác minh delivery thật sau khi cấu hình Dashboard.
+
+E2e chạy trên database test riêng đã migrate; đặt thêm TEST_REDIS_URL để kiểm tra
+worker qua Redis thật (nếu thiếu thì riêng case Redis bị skip):
+
+```powershell
+# Không trỏ TEST_DATABASE_URL vào database ứng dụng/production.
+$env:TEST_REDIS_URL = 'redis://localhost:6380/1'
+npm run test:e2e --workspace api -- --runInBand
+```
+
 API NestJS đã setup phần nền tảng: env validation, Prisma/PostgreSQL, health check,
 Swagger, ValidationPipe, CORS và lỗi thống nhất. Schema 16 bảng có initial migration kèm
 13 CHECK constraint. Đã có Clerk guard, /me, Projects/Trash/restore và Brand Brief.

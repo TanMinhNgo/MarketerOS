@@ -4,13 +4,13 @@ import { requireFeature } from '../auth/require-feature';
 import { ProjectsRepository } from '../projects/projects.repository';
 
 @Injectable()
-export class AssistantGuard implements CanActivate {
+export class AutomationGuard implements CanActivate {
   constructor(private readonly projects: ProjectsRepository) {}
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     requireFeature(
-      request.user.plan !== 'free' ? request.user : { features: [] },
-      'ai_assistant',
+      request.user.plan === 'max' ? request.user : { features: [] },
+      'automation',
     );
     await this.projects.owned(
       String(request.params.projectId),

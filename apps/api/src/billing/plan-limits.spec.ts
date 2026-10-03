@@ -7,6 +7,13 @@ test('only confirmed project and TEXT limits are configured', () => {
   expect(PLAN_LIMITS).toEqual({
     free: { projects: 3, text: 10 },
     pro: { projects: 20, text: 200, assistant: 300 },
+    max: {
+      projects: 50,
+      text: 500,
+      assistant: 1000,
+      automations: 10,
+      automationRuns: 60,
+    },
   });
   expect(
     PlanLimitDetailsSchema.parse({ limit: 3, used: 20, plan: 'free' }),

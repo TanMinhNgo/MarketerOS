@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AutomationModule } from './automation/automation.module';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
 import { validateEnvironment } from './common/env';
@@ -16,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
+    AutomationModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: join(__dirname, '..', '.env'),
