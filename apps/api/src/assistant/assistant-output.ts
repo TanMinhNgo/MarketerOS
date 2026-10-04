@@ -95,53 +95,76 @@ export const AssistantProviderOutputSchema = z
   })
   .strict();
 
+type ProviderAction = z.infer<
+  typeof AssistantProviderOutputSchema
+>['actions'][number];
+
+function normalizeDraft(
+  action: Extract<ProviderAction, { type: 'create_draft' }>,
+) {
+  return {
+    type: action.type,
+    channel: action.channel,
+    title: action.title,
+    body: action.body,
+    hashtags: action.hashtags,
+    cta: action.cta,
+    ...(action.assetIds ? { assetIds: action.assetIds } : {}),
+    ...(action.imagePrompt ? { imagePrompt: action.imagePrompt } : {}),
+  };
+}
+
+function normalizeImage(
+  action: Extract<ProviderAction, { type: 'generate_image' }>,
+) {
+  return {
+    type: action.type,
+    prompt: action.prompt,
+    size: action.size,
+    ...(action.name ? { name: action.name } : {}),
+    ...(action.attachToContentId
+      ? { attachToContentId: action.attachToContentId }
+      : {}),
+  };
+}
+
+function normalizePatch(
+  action: Extract<ProviderAction, { type: 'edit_content' | 'update_brief' }>,
+) {
+  if (
+    new Set(action.changes.map((change) => change.field)).size !==
+    action.changes.length
+  )
+    throw new Error('Duplicate assistant patch field');
+  const changes = Object.fromEntries(
+    action.changes.map(({ field, value }) => [field, value]),
+  );
+  if (action.type === 'update_brief') return { type: action.type, changes };
+  return {
+    type: action.type,
+    contentId: action.contentId,
+    ...changes,
+    ...(action.assetIds ? { assetIds: action.assetIds } : {}),
+    ...(action.assetMode ? { assetMode: action.assetMode } : {}),
+    ...(action.imagePrompt ? { imagePrompt: action.imagePrompt } : {}),
+  };
+}
+
+function normalizeAction(action: ProviderAction) {
+  if (action.type === 'create_draft') return normalizeDraft(action);
+  if (action.type === 'generate_image') return normalizeImage(action);
+  if (action.type === 'edit_content' || action.type === 'update_brief')
+    return normalizePatch(action);
+  return action;
+}
+
 export function parseAssistantOutput(raw: unknown) {
   const output = AssistantProviderOutputSchema.parse(raw);
   return {
     text: AssistantOutputSchema.shape.text.parse(output.text),
     // Each proposed action is validated separately so one invalid media action
     // cannot discard an otherwise useful assistant reply.
-    actions: output.actions.map((action) => {
-      if (action.type === 'create_draft')
-        return {
-          type: action.type,
-          channel: action.channel,
-          title: action.title,
-          body: action.body,
-          hashtags: action.hashtags,
-          cta: action.cta,
-          ...(action.assetIds ? { assetIds: action.assetIds } : {}),
-          ...(action.imagePrompt ? { imagePrompt: action.imagePrompt } : {}),
-        };
-      if (action.type === 'generate_image')
-        return {
-          type: action.type,
-          prompt: action.prompt,
-          size: action.size,
-          ...(action.name ? { name: action.name } : {}),
-          ...(action.attachToContentId
-            ? { attachToContentId: action.attachToContentId }
-            : {}),
-        };
-      if (!('changes' in action)) return action;
-      if (
-        new Set(action.changes.map((change) => change.field)).size !==
-        action.changes.length
-      )
-        throw new Error('Duplicate assistant patch field');
-      const changes = Object.fromEntries(
-        action.changes.map(({ field, value }) => [field, value]),
-      );
-      if (action.type === 'update_brief') return { type: action.type, changes };
-      return {
-        type: action.type,
-        contentId: action.contentId,
-        ...changes,
-        ...(action.assetIds ? { assetIds: action.assetIds } : {}),
-        ...(action.assetMode ? { assetMode: action.assetMode } : {}),
-        ...(action.imagePrompt ? { imagePrompt: action.imagePrompt } : {}),
-      };
-    }) as AssistantProposedAction[],
+    actions: output.actions.map(normalizeAction) as AssistantProposedAction[],
     validationNote: output.validationNote,
   };
 }

@@ -22,19 +22,19 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 function output(row: Awaited<ReturnType<MediaRepository['get']>>) {
-  const {
-    storageKey: _storageKey,
-    byteSize,
-    createdAt,
-    updatedAt,
-    ...safe
-  } = row;
-  void _storageKey;
   return {
-    ...safe,
-    byteSize: byteSize.toString(),
-    createdAt: createdAt.toISOString(),
-    updatedAt: updatedAt.toISOString(),
+    id: row.id,
+    projectId: row.projectId,
+    generationId: row.generationId,
+    kind: row.kind,
+    name: row.name,
+    mimeType: row.mimeType,
+    byteSize: row.byteSize.toString(),
+    width: row.width,
+    height: row.height,
+    altText: row.altText,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
