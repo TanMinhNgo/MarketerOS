@@ -66,26 +66,17 @@ export async function applyAction(projectId: string, action: AssistantAction): P
     case "create_draft": {
       const { channel, title, body, hashtags, cta } = action;
       const created = await api(contents, ContentResponseSchema, { method: "POST", body: { channel, title, body, hashtags, cta } });
-      const ids = [...(action.assetIds ?? [])];
-      if (action.imagePrompt) ids.push(await generateAsset(projectId, action.imagePrompt, title));
-      if (ids.length) await attachAssets(projectId, created.id, ids, "replace");
+      await addImages(projectId, created.id, action, "replace", title);
       return;
     }
     case "edit_content": {
       const fields = Object.fromEntries(CONTENT_FIELDS.filter((f) => f in action).map((f) => [f, action[f]]));
       if (Object.keys(fields).length) await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: fields });
-      const ids = [...(action.assetIds ?? [])];
-      if (action.imagePrompt) ids.push(await generateAsset(projectId, action.imagePrompt));
-      if (ids.length) await attachAssets(projectId, action.contentId, ids, action.assetMode ?? "append");
+      await addImages(projectId, action.contentId, action, action.assetMode ?? "append");
       return;
     }
-    case "schedule": {
-      const item = await api(`${contents}/${action.contentId}`, ContentResponseSchema);
-      const patch = schedulePatch(item, item.status === "READY" ? "SCHEDULED" : item.status, action.scheduledAt);
-      if (typeof patch === "string") throw new ApiError(409, "CONFLICT", patch);
-      if (patch) await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: patch });
-      return;
-    }
+    case "schedule":
+      return applySchedule(`${contents}/${action.contentId}`, action.scheduledAt);
     case "update_brief": {
       const brief = await api(`/api/projects/${projectId}/brand-brief`, BrandBriefResponseSchema);
       await api(`/api/projects/${projectId}/brand-brief`, BrandBriefResponseSchema, { method: "PUT", body: mergeBrief(brief, action.changes) });
@@ -100,6 +91,21 @@ export async function applyAction(projectId: string, action: AssistantAction): P
       await attachAssets(projectId, action.contentId, action.assetIds, action.mode);
       return;
   }
+}
+
+/** Lên lịch / dời lịch bài đã duyệt; bài chưa duyệt bị từ chối (schedulePatch trả thông báo lỗi). */
+async function applySchedule(path: string, scheduledAt: string) {
+  const item = await api(path, ContentResponseSchema);
+  const patch = schedulePatch(item, item.status === "READY" ? "SCHEDULED" : item.status, scheduledAt);
+  if (typeof patch === "string") throw new ApiError(409, "CONFLICT", patch);
+  if (patch) await api(path, ContentResponseSchema, { method: "PATCH", body: patch });
+}
+
+/** Ảnh kèm bài trong đề xuất: ảnh có sẵn + (nếu có) một ảnh AI mới, rồi gắn vào bài theo `mode`. */
+async function addImages(projectId: string, contentId: string, a: { assetIds?: string[]; imagePrompt?: string }, mode: "append" | "replace", name?: string) {
+  const ids = [...(a.assetIds ?? [])];
+  if (a.imagePrompt) ids.push(await generateAsset(projectId, a.imagePrompt, name));
+  if (ids.length) await attachAssets(projectId, contentId, ids, mode);
 }
 
 export const MAX_IMAGES = 10;

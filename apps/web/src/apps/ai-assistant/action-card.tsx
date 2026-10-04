@@ -62,9 +62,15 @@ function ImagesPreview({ projectId, ids, prompt, replace }: Readonly<{ projectId
   );
 }
 
+/** Bài mà hành động nhắm tới (tạo ảnh: bài sẽ gắn ảnh; sửa / lên lịch / gắn ảnh: bài đang có). */
+function targetIdOf(action: AssistantAction): string | undefined {
+  if (action.type === "generate_image") return action.attachToContentId;
+  return "contentId" in action ? action.contentId : undefined;
+}
+
 /** Tóm tắt hành động: tiêu đề + phần xem trước (cũ → mới khi sửa). */
 function preview(projectId: string, action: AssistantAction, contents: ContentResponse[], brief: BrandBriefResponse | null | undefined) {
-  const targetId = action.type === "generate_image" ? action.attachToContentId : "contentId" in action ? action.contentId : undefined;
+  const targetId = targetIdOf(action);
   const target = targetId ? contents.find((c) => c.id === targetId) : undefined;
   const name = target ? `“${target.title}”` : "a saved post";
   // Kênh của bài: bài mới lấy từ action, sửa/lên lịch lấy từ bài đang có.
@@ -113,7 +119,7 @@ function preview(projectId: string, action: AssistantAction, contents: ContentRe
         return {
           icon: ImagePlus,
           title: target ? `Create an image for ${name}` : "Create an image",
-          body: <Diff label={`${SHAPE[action.size]} image${action.name ? ` · ${action.name}` : ""}`} after={action.prompt} />,
+          body: <Diff label={[`${SHAPE[action.size]} image`, action.name].filter(Boolean).join(" · ")} after={action.prompt} />,
         };
       case "attach_media":
         return {

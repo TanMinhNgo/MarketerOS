@@ -84,19 +84,22 @@ export function Studio({ projectId, projectName, language }: { projectId: string
   // Kênh lấy từ lần tạo (form có thể đã đổi sau đó), generationId theo từng biến thể.
   // Lưu nháp rồi gắn ảnh đã chọn (nếu có). Gắn ảnh lỗi thì bài vẫn đã lưu: báo để người dùng thêm lại trong Edit.
   const saveVariant = async (v: GeneratedVariant, generationId: string | null, assetIds: string[]) => {
-    await save
-      .mutateAsync({ channel: state.input?.channel ?? channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId })
-      .then(async (created) => {
-        if (assetIds.length)
-          await api(`/api/projects/${projectId}/contents/${created.id}/assets`, ContentAssetsResponseSchema, { method: "PUT", body: { assetIds } }).catch((e: unknown) =>
-            notify.apiError("Saved, but the images weren't attached", e),
-          );
-        notify.success("Saved to drafts", { description: assetIds.length ? `With ${assetIds.length} image${assetIds.length > 1 ? "s" : ""}. Find it in Saved drafts and on the Content Calendar.` : "Find it in Saved drafts and on the Content Calendar." });
-      })
-      .catch(() => {
-        // lỗi đã hiện bằng toast từ MutationCache; ném lại để thẻ không báo "đã lưu"
-        throw new Error("save failed");
-      });
+    let created;
+    try {
+      created = await save.mutateAsync({ channel: state.input?.channel ?? channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId });
+    } catch {
+      // lỗi đã hiện bằng toast từ MutationCache; ném lại để thẻ không báo "đã lưu"
+      throw new Error("save failed");
+    }
+    if (assetIds.length) {
+      try {
+        await api(`/api/projects/${projectId}/contents/${created.id}/assets`, ContentAssetsResponseSchema, { method: "PUT", body: { assetIds } });
+      } catch (e) {
+        notify.apiError("Saved, but the images weren't attached", e);
+      }
+    }
+    const withImages = assetIds.length ? `With ${assetIds.length} ${assetIds.length > 1 ? "images" : "image"}. ` : "";
+    notify.success("Saved to drafts", { description: `${withImages}Find it in Saved drafts and on the Content Calendar.` });
   };
 
   return (

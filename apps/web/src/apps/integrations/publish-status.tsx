@@ -4,12 +4,32 @@ import type { ContentResponse } from "@marketos/shared";
 import { ExternalLink, Send } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ERROR_TEXT, isPublishable, latestFor, useCanPublish, useChannelConnection, usePublications, usePublishNow } from "@/lib/integrations-api";
+import { ERROR_TEXT, isPublishable, latestFor, useCanPublish, useChannelConnection, usePublications, usePublishNow, type Publication } from "@/lib/integrations-api";
 import { notify } from "@/lib/notify/notify";
 import { cn } from "@/lib/utils";
 import { channelLabel } from "../content-studio/channels";
 
 const when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** Dòng trạng thái của một bài: đã đăng / đang đăng / lỗi / sẽ tự đăng / chưa kết nối. `target` null = chưa kết nối. */
+function statusNote(last: Publication | undefined, target: string | null, item: ContentResponse): React.ReactNode {
+  if (last?.status === "PUBLISHED")
+    return (
+      <span className="text-emerald-700 dark:text-emerald-300">
+        Published {last.publishedAt && when.format(new Date(last.publishedAt))}
+        {last.externalUrl && (
+          <a href={last.externalUrl} target="_blank" rel="noopener noreferrer" className="ml-1 inline-flex items-center gap-0.5 underline">
+            View post <ExternalLink className="size-3" aria-hidden="true" />
+          </a>
+        )}
+      </span>
+    );
+  if (last?.status === "QUEUED" || last?.status === "PUBLISHING") return <span className="text-sky-700 dark:text-sky-300">Publishing to {target ?? channelLabel(item.channel)}…</span>;
+  if (last?.status === "FAILED") return <span className="text-destructive">Couldn&apos;t publish. {last.errorCode ? ERROR_TEXT[last.errorCode] : ""}</span>;
+  if (target && item.status === "SCHEDULED" && item.scheduledAt) return <span className="text-muted-foreground">Auto-publishes to {target} on {when.format(new Date(item.scheduledAt))}</span>;
+  if (!target && (item.status === "READY" || item.status === "SCHEDULED")) return <span className="text-muted-foreground">Connect {channelLabel(item.channel)} in Integrations to publish it.</span>;
+  return null;
+}
 
 /**
  * Trạng thái đăng lên kênh thật của một bài + nút Publish now (có bước xác nhận vì đăng ra ngoài).
@@ -41,22 +61,7 @@ export function PublishStatus({ projectId, item, className }: Readonly<{ project
       onError: (e) => notify.apiError("Couldn't publish", e),
     });
 
-  let note: React.ReactNode = null;
-  if (last?.status === "PUBLISHED")
-    note = (
-      <span className="text-emerald-700 dark:text-emerald-300">
-        Published {last.publishedAt && when.format(new Date(last.publishedAt))}
-        {last.externalUrl && (
-          <a href={last.externalUrl} target="_blank" rel="noopener noreferrer" className="ml-1 inline-flex items-center gap-0.5 underline">
-            View post <ExternalLink className="size-3" aria-hidden="true" />
-          </a>
-        )}
-      </span>
-    );
-  else if (pending) note = <span className="text-sky-700 dark:text-sky-300">Publishing to {target}…</span>;
-  else if (last?.status === "FAILED") note = <span className="text-destructive">Couldn&apos;t publish. {last.errorCode ? ERROR_TEXT[last.errorCode] : ""}</span>;
-  else if (connection && item.status === "SCHEDULED" && item.scheduledAt) note = <span className="text-muted-foreground">Auto-publishes to {target} on {when.format(new Date(item.scheduledAt))}</span>;
-  else if (!connection && approved) note = <span className="text-muted-foreground">Connect {channelLabel(item.channel)} in Integrations to publish it.</span>;
+  const note = statusNote(last, connection ? target : null, item);
 
   const showButton = connection && approved && !pending && last?.status !== "PUBLISHED";
 

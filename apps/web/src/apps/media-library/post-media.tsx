@@ -18,7 +18,12 @@ export function ImagePicker({ projectId, initial, onSave, onClose, saving }: Rea
   const assets = useAssets(projectId);
   const [picked, setPicked] = useState(initial);
   const items = assets.data?.pages.flatMap((p) => p.items) ?? [];
-  const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < MAX_PER_POST ? [...p, id] : p));
+  // Bỏ chọn nếu đã chọn; thêm vào cuối nếu chưa đủ giới hạn.
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      if (p.includes(id)) return p.filter((x) => x !== id);
+      return p.length < MAX_PER_POST ? [...p, id] : p;
+    });
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
