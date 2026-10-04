@@ -9,6 +9,10 @@ import { AutomationModule } from './automation/automation.module';
 import { AutomationExecutor } from './automation/automation.executor';
 import { AutomationWorker } from './automation/automation.worker';
 import { PromptBuilder } from './ai/prompt-builder';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { PublicationWorker } from './integrations/publication.worker';
+import { MediaModule } from './media/media.module';
+import { MediaCleanupWorker } from './media/media-cleanup.worker';
 
 @Module({
   imports: [
@@ -21,7 +25,15 @@ import { PromptBuilder } from './ai/prompt-builder';
     AuthModule,
     AssistantModule,
     AutomationModule,
+    IntegrationsModule,
+    MediaModule,
   ],
-  providers: [AutomationExecutor, AutomationWorker, PromptBuilder],
+  providers: [
+    AutomationExecutor,
+    AutomationWorker,
+    PublicationWorker,
+    MediaCleanupWorker,
+    PromptBuilder,
+  ],
 })
 export class WorkerModule {}

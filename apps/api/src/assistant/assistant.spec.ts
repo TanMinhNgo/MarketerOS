@@ -12,6 +12,213 @@ import {
   AssistantProviderOutputSchema,
   parseAssistantOutput,
 } from './assistant-output';
+import {
+  AssistantActionSchema,
+  AssistantProposedActionSchema,
+} from '@marketos/shared';
+
+test('media action schemas are strict and the server owns id and status', () => {
+  const proposal = {
+    type: 'generate_image',
+    prompt: 'A warm coffee campaign image',
+    size: '1024x1024',
+    attachToContentId: 'post',
+  };
+  expect(AssistantProposedActionSchema.safeParse(proposal).success).toBe(true);
+  expect(
+    AssistantProposedActionSchema.safeParse({
+      ...proposal,
+      storageKey: 'secret',
+    }).success,
+  ).toBe(false);
+  expect(AssistantActionSchema.safeParse(proposal).success).toBe(false);
+  expect(
+    AssistantProposedActionSchema.safeParse({
+      type: 'attach_media',
+      contentId: 'post',
+      assetIds: ['a', 'a'],
+      mode: 'append',
+    }).success,
+  ).toBe(false);
+  expect(
+    AssistantProposedActionSchema.safeParse({
+      type: 'attach_media',
+      contentId: 'post',
+      assetIds: Array.from({ length: 11 }, (_, index) => `a${index}`),
+      mode: 'replace',
+    }).success,
+  ).toBe(false);
+});
+
+test('media validator drops foreign assets, DONE targets and duplicate/oversized lists', () => {
+  const brief = {
+    language: 'vi' as const,
+    avoidWords: [],
+    businessAddress: null,
+  };
+  const contents = [
+    { id: 'draft', status: 'DRAFT' },
+    { id: 'done', status: 'DONE' },
+  ];
+  const proposals = [
+    { type: 'generate_image', prompt: 'Coffee', size: '1024x1024' },
+    {
+      type: 'generate_image',
+      prompt: 'Coffee',
+      size: '1024x1024',
+      attachToContentId: 'done',
+    },
+    {
+      type: 'attach_media',
+      contentId: 'draft',
+      assetIds: ['own'],
+      mode: 'append',
+    },
+    {
+      type: 'attach_media',
+      contentId: 'draft',
+      assetIds: ['foreign'],
+      mode: 'append',
+    },
+    {
+      type: 'attach_media',
+      contentId: 'done',
+      assetIds: ['own'],
+      mode: 'replace',
+    },
+  ];
+  expect(
+    filterAssistantActions(proposals, contents, brief, [], [{ id: 'own' }]),
+  ).toHaveLength(2);
+  for (const assetIds of [
+    ['own', 'own'],
+    Array.from({ length: 11 }, (_, index) => `a${index}`),
+  ])
+    expect(
+      filterAssistantActions(
+        [
+          {
+            type: 'attach_media',
+            contentId: 'draft',
+            assetIds,
+            mode: 'append',
+          },
+        ],
+        contents,
+        brief,
+        [],
+        [{ id: 'own' }],
+      ),
+    ).toHaveLength(0);
+});
+
+test('draft/edit media fields validate ownership, uniqueness, image count and image-only edits', () => {
+  const draft = {
+    type: 'create_draft',
+    channel: 'FACEBOOK',
+    title: 'Coffee',
+    body: `Hook\n${Array(80).fill('coffee').join(' ')}`,
+    hashtags: ['Coffee', 'Morning'],
+    cta: 'Explore now',
+  };
+  const brief = {
+    language: 'vi' as const,
+    avoidWords: [],
+    businessAddress: null,
+  };
+  const contents = [
+    { id: 'editable', status: 'READY' },
+    { id: 'done', status: 'DONE' },
+  ];
+  const assets = [{ id: 'own' }];
+  const accept = (action: object) =>
+    filterAssistantActions([action], contents, brief, [], assets);
+  expect(
+    AssistantProposedActionSchema.safeParse({
+      type: 'edit_content',
+      contentId: 'editable',
+      assetIds: ['own'],
+    }).success,
+  ).toBe(true);
+  expect(
+    accept({ type: 'edit_content', contentId: 'editable', assetIds: ['own'] }),
+  ).toMatchObject([
+    { type: 'edit_content', status: 'proposed', assetIds: ['own'] },
+  ]);
+  expect(
+    accept({
+      type: 'edit_content',
+      contentId: 'editable',
+      imagePrompt: 'Warm coffee photo',
+    }),
+  ).toHaveLength(1);
+  expect(
+    AssistantProposedActionSchema.safeParse({
+      type: 'edit_content',
+      contentId: 'editable',
+      assetIds: [],
+    }).success,
+  ).toBe(false);
+  for (const action of [
+    { ...draft, assetIds: ['foreign'] },
+    { ...draft, assetIds: ['own', 'own'] },
+    { ...draft, assetIds: Array.from({ length: 11 }, (_, i) => `asset-${i}`) },
+    {
+      ...draft,
+      assetIds: Array.from({ length: 10 }, (_, i) => `asset-${i}`),
+      imagePrompt: 'New photo',
+    },
+    { type: 'edit_content', contentId: 'editable', assetIds: ['foreign'] },
+    { type: 'edit_content', contentId: 'editable', assetIds: ['own', 'own'] },
+    {
+      type: 'edit_content',
+      contentId: 'editable',
+      assetIds: Array.from({ length: 11 }, (_, i) => `asset-${i}`),
+    },
+    { type: 'edit_content', contentId: 'done', assetIds: ['own'] },
+    {
+      type: 'edit_content',
+      contentId: 'editable',
+      assetIds: Array.from({ length: 10 }, (_, i) => `asset-${i}`),
+      imagePrompt: 'New photo',
+      assetMode: 'replace',
+    },
+  ])
+    expect(accept(action)).toHaveLength(0);
+});
+
+test('provider nullable media fields become optional public fields', () => {
+  const result = parseAssistantOutput({
+    text: 'Gợi ý bài có ảnh.',
+    validationNote: 'Có đề xuất chưa hợp lệ.',
+    actions: [
+      {
+        type: 'edit_content',
+        contentId: 'post',
+        changes: [],
+        assetIds: ['asset'],
+        assetMode: null,
+        imagePrompt: null,
+      },
+      {
+        type: 'create_draft',
+        channel: 'FACEBOOK',
+        title: 'Coffee',
+        body: `Hook\n${Array(80).fill('coffee').join(' ')}`,
+        hashtags: ['Coffee', 'Morning'],
+        cta: 'Explore now',
+        assetIds: null,
+        imagePrompt: 'Warm coffee image',
+      },
+    ],
+  });
+  expect(result.actions).toMatchObject([
+    { type: 'edit_content', contentId: 'post', assetIds: ['asset'] },
+    { type: 'create_draft', imagePrompt: 'Warm coffee image' },
+  ]);
+  expect(result.actions[0]).not.toHaveProperty('assetMode');
+  expect(result.actions[1]).not.toHaveProperty('assetIds');
+});
 
 test.each([
   ['provider failure', false, false, 'FAILED', 10, 5],
@@ -32,6 +239,8 @@ test.each([
           body: 'Quá ngắn',
           hashtags: [],
           cta: null,
+          assetIds: null,
+          imagePrompt: null,
         },
       ],
     };
@@ -54,6 +263,7 @@ test.each([
     const service = new AssistantService(
       {
         contents: jest.fn().mockResolvedValue([]),
+        assets: jest.fn().mockResolvedValue([]),
         finish,
       } as unknown as AssistantRepository,
       { assistant: provider } as unknown as OpenAiService,
@@ -119,6 +329,9 @@ test('provider schema uses strict required objects and patches preserve omitted 
         type: 'edit_content',
         contentId: 'c',
         changes: [{ field: 'cta', value: null }],
+        assetIds: null,
+        assetMode: null,
+        imagePrompt: null,
       },
       {
         type: 'update_brief',
@@ -178,6 +391,33 @@ test('assistant prompt isolates untrusted brief, saved posts and history, with b
       role: 'user',
       content: injection.repeat(1000),
     })),
+    media: {
+      assets: [
+        {
+          id: 'asset-1',
+          name: injection,
+          kind: 'IMAGE',
+          generationId: null,
+          altText: injection,
+          width: 100,
+          height: 100,
+          createdAt: new Date(),
+          storageKey: 'storage-secret',
+          url: 'https://secret.example/file',
+        },
+        ...Array.from({ length: 30 }, (_, index) => ({
+          id: `extra-${index}`,
+          name: 'Photo',
+          kind: 'IMAGE',
+          generationId: null,
+          altText: null,
+          width: 100,
+          height: 100,
+          createdAt: new Date(),
+        })),
+      ],
+      links: [{ contentId: 'c', assetId: 'asset-1', position: 0 }],
+    },
     userMessage: { content: injection },
   } as unknown as Awaited<ReturnType<AssistantRepository['reserve']>>;
   const prompt = new AssistantPrompt().build(context);
@@ -188,10 +428,16 @@ test('assistant prompt isolates untrusted brief, saved posts and history, with b
   expect(prompt.system).toContain('"captionMax":149');
   expect(prompt.system).toContain('"titleMax":69');
   expect(prompt.prompt).not.toContain('<system>');
+  expect(prompt.prompt).toContain('asset-1');
+  expect(prompt.prompt).not.toContain('extra-29');
+  expect(prompt.prompt).toContain('"assetIds":["asset-1"]');
+  expect(prompt.prompt).not.toContain('storage-secret');
+  expect(prompt.prompt).not.toContain('secret.example');
   for (const tag of [
     'project',
     'brand_brief',
     'saved_contents',
+    'media_assets',
     'conversation_history',
     'user_request',
   ]) {
@@ -340,6 +586,8 @@ test.each([
           body: draftBody,
           hashtags: ['ThẻMột', 'ThẻHai'],
           cta: 'Khám phá ngay',
+          assetIds: null,
+          imagePrompt: null,
         },
       ],
     });
@@ -379,7 +627,11 @@ test.each([
         });
       },
     );
-    const repository = { contents: jest.fn().mockResolvedValue([]), finish };
+    const repository = {
+      contents: jest.fn().mockResolvedValue([]),
+      assets: jest.fn().mockResolvedValue([]),
+      finish,
+    };
     const service = new AssistantService(
       repository as unknown as AssistantRepository,
       { assistant: provider } as unknown as OpenAiService,

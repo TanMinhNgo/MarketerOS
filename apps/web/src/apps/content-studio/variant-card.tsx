@@ -1,7 +1,7 @@
 "use client";
 
 import type { GeneratedVariant } from "@marketos/shared";
-import { Check, Copy, RefreshCw, Save } from "lucide-react";
+import { Check, Copy, ImagePlus, RefreshCw, Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { notify } from "@/lib/notify/notify";
 import { TagInput } from "@/components/tag-input";
@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { variantToText } from "./channels";
+import { AssetStrip } from "../media-library/asset-thumb";
+import { GenerateDialog } from "../media-library";
+import { ImagePicker } from "../media-library/post-media";
+import { MAX_PER_POST } from "@/lib/media-api";
 import type { VariantState } from "./use-generation";
 
 export async function copyText(text: string) {
@@ -43,11 +47,18 @@ function Streaming({ index, data }: { index: number; data: Partial<GeneratedVari
   );
 }
 
-type CardProps = { index: number; saving: boolean; onSave: (v: GeneratedVariant) => Promise<void>; onRegenerate?: () => void };
+type CardProps = { projectId: string; index: number; saving: boolean; onSave: (v: GeneratedVariant, assetIds: string[]) => Promise<void>; onRegenerate?: () => void };
 
 /** Biến thể đã xong: sửa trực tiếp, sao chép, tạo lại, lưu thành bản nháp. */
-function Editable({ index, initial, saving, onSave, onRegenerate }: CardProps & { initial: GeneratedVariant }) {
+function Editable({ projectId, index, initial, saving, onSave, onRegenerate }: CardProps & { initial: GeneratedVariant }) {
   const [v, setV] = useState<GeneratedVariant>(initial);
+  // Ảnh gắn kèm khi lưu nháp (chọn từ thư viện hoặc tạo bằng AI từ chính nội dung bài).
+  const [images, setImages] = useState<string[]>([]);
+  const [dialog, setDialog] = useState<"pick" | "create" | null>(null);
+  const setImg = (ids: string[]) => {
+    setImages(ids.slice(0, MAX_PER_POST));
+    setSaved(false);
+  };
   const [saved, setSaved] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const edited = v !== initial;
@@ -82,17 +93,41 @@ function Editable({ index, initial, saving, onSave, onRegenerate }: CardProps & 
       <Textarea aria-label={`Variant ${index + 1} text`} value={v.body} rows={6} maxLength={10000} onChange={(e) => set("body", e.target.value)} />
       <TagInput value={v.hashtags} onChange={(h) => set("hashtags", h)} placeholder="Add hashtag…" max={20} />
       <Input aria-label={`Variant ${index + 1} call to action`} value={v.cta} placeholder="Call to action (optional)" maxLength={300} onChange={(e) => set("cta", e.target.value)} />
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium">Images</p>
+          <Button type="button" size="xs" variant="outline" disabled={images.length >= MAX_PER_POST} onClick={() => setDialog("pick")}>
+            <ImagePlus /> From library
+          </Button>
+          <Button type="button" size="xs" variant="outline" disabled={images.length >= MAX_PER_POST} onClick={() => setDialog("create")}>
+            <Sparkles /> Create with AI
+          </Button>
+        </div>
+        {images.length > 0 && <AssetStrip projectId={projectId} ids={images} onRemove={(id) => setImg(images.filter((x) => x !== id))} />}
+      </div>
       <Button
         type="button"
         size="sm"
         disabled={invalid || saving || saved}
         onClick={async () => {
-          await onSave({ ...v, title: v.title.trim(), body: v.body.trim(), cta: v.cta.trim() });
+          await onSave({ ...v, title: v.title.trim(), body: v.body.trim(), cta: v.cta.trim() }, images);
           setSaved(true);
         }}
       >
         {saved ? <Check /> : <Save />} {saved ? "Saved to drafts" : saving ? "Saving…" : "Save as draft"}
       </Button>
+      {dialog === "pick" && <ImagePicker projectId={projectId} initial={images} saving={false} onClose={() => setDialog(null)} onSave={(ids) => {
+            setImg(ids);
+            setDialog(null);
+          }} />}
+      {dialog === "create" && (
+        <GenerateDialog
+          projectId={projectId}
+          defaultPrompt={`An image for this post: ${v.title}. ${v.body.slice(0, 400)}`}
+          onCreated={(a) => setImg([...images, a.id])}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </article>
   );
 }

@@ -63,6 +63,9 @@ enum ConnectionStatus {
   CONNECTED
   REAUTH_REQUIRED
   DISCONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
 }
 
 enum PublicationStatus {
@@ -119,6 +122,7 @@ model User {
   references      PersonalReference[]
   activities      UserActivity[]
   behavior        BehaviorProfile?
+  integrationOAuthSessions IntegrationOAuthSession[]
   createdAt       DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime                @updatedAt @db.Timestamptz(3)
 }
@@ -144,6 +148,7 @@ model Project {
   activities         UserActivity[]
   assistantMessages  AssistantMessage[]
   automations        Automation[]
+  integrationOAuthSessions IntegrationOAuthSession[]
 
   @@index([ownerId, deletedAt, createdAt])
 }
@@ -328,6 +333,13 @@ model Asset {
   @@index([generationId])
 }
 
+/// Durable object cleanup outbox; populated by an Asset DELETE trigger, including cascades.
+model MediaDeletion {
+  id         Int      @id @default(autoincrement())
+  storageKey String   @unique
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+}
+
 model ContentAsset {
   contentId String
   content   ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
@@ -370,9 +382,14 @@ model ChannelConnection {
   displayName       String
   status            ConnectionStatus @default(CONNECTED)
   credentialRef     String?
+  avatarUrl         String?
+  externalUrl       String?
+  expiresAt         DateTime?        @db.Timestamptz(3)
+  connectedAt       DateTime         @default(now()) @db.Timestamptz(3)
   grantedScopes     String[]         @default([])
   lastSyncedAt      DateTime?        @db.Timestamptz(3)
   publications      Publication[]
+  credential        IntegrationCredential?
   activities        UserActivity[]
   createdAt         DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime         @updatedAt @db.Timestamptz(3)
@@ -395,6 +412,9 @@ model Publication {
   externalPostId  String?
   externalUrl     String?
   errorCode       String?
+  attempts        Int                 @default(0)
+  claimedAt       DateTime?           @db.Timestamptz(3)
+  nextAttemptAt   DateTime?           @db.Timestamptz(3)
   metrics         PublicationMetric[]
   activities      UserActivity[]
   createdAt       DateTime            @default(now()) @db.Timestamptz(3)
@@ -404,6 +424,32 @@ model Publication {
   @@unique([connectionId, externalPostId])
   @@index([connectionId, status, scheduledAt])
   @@index([contentId])
+}
+
+model IntegrationCredential {
+  id           String            @id @default(cuid())
+  connectionId String            @unique
+  connection   ChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  ciphertext   String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+}
+
+model IntegrationOAuthSession {
+  id          String   @id
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider    String
+  stateHash   String?  @unique
+  ciphertext  String?
+  expiresAt   DateTime @db.Timestamptz(3)
+  consumedAt  DateTime? @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@index([expiresAt])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model PublicationMetric {

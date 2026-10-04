@@ -39,6 +39,7 @@ suite(
     };
     const auth = (id = pro) => ({ Authorization: `Bearer ${id}` });
     const ids: Record<string, string> = {};
+    const mediaStorageKeys: string[] = [];
     let project: string;
     let second: string;
     let foreign: string;
@@ -81,6 +82,9 @@ suite(
           type: 'edit_content',
           contentId: doneId,
           changes: [{ field: 'title', value: 'Không được sửa' }],
+          assetIds: null,
+          assetMode: null,
+          imagePrompt: null,
         },
         {
           type: 'schedule',
@@ -197,6 +201,10 @@ suite(
       if (prisma)
         await prisma.user.deleteMany({
           where: { clerkId: { in: Object.keys(principals) } },
+        });
+      if (prisma)
+        await prisma.mediaDeletion.deleteMany({
+          where: { storageKey: { in: mediaStorageKeys } },
         });
       if (app) await app.close();
     });
@@ -368,6 +376,206 @@ suite(
       expect(older.items).toHaveLength(1);
     });
 
+    it('offers media actions from safe project context without generating or attaching images', async () => {
+      const ownKey = `assistant-media-${randomUUID()}`;
+      const foreignKey = `assistant-media-${randomUUID()}`;
+      mediaStorageKeys.push(ownKey, foreignKey);
+      const ownAsset = await prisma.asset.create({
+        data: {
+          projectId: project,
+          kind: 'IMAGE',
+          name: 'Coffee photo',
+          storageKey: ownKey,
+          mimeType: 'image/png',
+          byteSize: 3n,
+          width: 100,
+          height: 100,
+          altText: 'Warm coffee photo',
+        },
+      });
+      const foreignAsset = await prisma.asset.create({
+        data: {
+          projectId: foreign,
+          kind: 'IMAGE',
+          name: 'Foreign photo',
+          storageKey: foreignKey,
+          mimeType: 'image/png',
+          byteSize: 3n,
+          width: 100,
+          height: 100,
+        },
+      });
+      await prisma.contentAsset.create({
+        data: { contentId: draftId, assetId: ownAsset.id, position: 0 },
+      });
+      const beforeImages = await prisma.generation.count({
+        where: { userId: ids[pro], kind: 'IMAGE' },
+      });
+      const output = {
+        text: 'Mình đề xuất tạo ảnh và gắn ảnh đã có; chưa thực hiện.',
+        validationNote: 'Một số đề xuất không hợp lệ; hãy yêu cầu lại.',
+        actions: [
+          {
+            type: 'generate_image',
+            prompt: 'Warm coffee in natural light',
+            name: null,
+            size: '1024x1024',
+            attachToContentId: draftId,
+          },
+          {
+            type: 'attach_media',
+            contentId: draftId,
+            assetIds: [ownAsset.id],
+            mode: 'append',
+          },
+          {
+            type: 'attach_media',
+            contentId: draftId,
+            assetIds: [foreignAsset.id],
+            mode: 'replace',
+          },
+          {
+            type: 'attach_media',
+            contentId: doneId,
+            assetIds: [ownAsset.id],
+            mode: 'replace',
+          },
+          {
+            type: 'attach_media',
+            contentId: draftId,
+            assetIds: [ownAsset.id, ownAsset.id],
+            mode: 'append',
+          },
+        ],
+      };
+      provider.mockImplementationOnce((system: string, prompt: string) => {
+        expect(system).toContain('DỮ LIỆU KHÔNG TIN CẬY');
+        expect(prompt).toContain(ownAsset.id);
+        expect(prompt).toContain(`"assetIds":["${ownAsset.id}"]`);
+        expect(prompt).not.toContain(foreignAsset.id);
+        expect(prompt).not.toContain(ownKey);
+        expect(prompt).not.toContain('storageKey');
+        expect(prompt).not.toContain('https://');
+        return {
+          partialOutputStream: (async function* () {
+            await Promise.resolve();
+            yield { text: output.text };
+          })(),
+          output: Promise.resolve(output),
+          finishReason: Promise.resolve('stop'),
+          usage: Promise.resolve({ inputTokens: 10, outputTokens: 5 }),
+        };
+      });
+      const result = done((await send().expect(200)).text);
+      expect(
+        result.assistantMessage.actions.map((action) => action.type),
+      ).toEqual(['generate_image', 'attach_media']);
+      expect(
+        result.assistantMessage.actions.every(
+          (action) => action.status === 'proposed',
+        ),
+      ).toBe(true);
+      expect(
+        await prisma.generation.count({
+          where: { userId: ids[pro], kind: 'IMAGE' },
+        }),
+      ).toBe(beforeImages);
+      expect(
+        await prisma.contentAsset.count({
+          where: { contentId: draftId },
+        }),
+      ).toBe(1);
+    });
+
+    it('proposes a draft with existing/new image and an image-only edit, filtering foreign and DONE targets', async () => {
+      const storageKey = `assistant-media-${randomUUID()}`;
+      mediaStorageKeys.push(storageKey);
+      const asset = await prisma.asset.create({
+        data: {
+          projectId: project,
+          kind: 'IMAGE',
+          name: 'Campaign photo',
+          storageKey,
+          mimeType: 'image/png',
+          byteSize: 3n,
+          width: 100,
+          height: 100,
+        },
+      });
+      const output = {
+        text: 'Có hai đề xuất kèm ảnh, chưa áp dụng.',
+        validationNote: 'Một số đề xuất không hợp lệ; hãy yêu cầu lại.',
+        actions: [
+          {
+            type: 'create_draft',
+            channel: 'FACEBOOK',
+            title: 'Tiêu đề',
+            body: `Hook ngắn\n${Array(80).fill('Nội-dung').join(' ')}`,
+            hashtags: ['ThẻMột', 'ThẻHai'],
+            cta: 'Khám phá ngay',
+            assetIds: [asset.id],
+            imagePrompt: 'Natural light campaign photo',
+          },
+          {
+            type: 'edit_content',
+            contentId: readyId,
+            changes: [],
+            assetIds: [asset.id],
+            assetMode: 'replace',
+            imagePrompt: null,
+          },
+          {
+            type: 'edit_content',
+            contentId: readyId,
+            changes: [],
+            assetIds: ['foreign-asset'],
+            assetMode: 'append',
+            imagePrompt: null,
+          },
+          {
+            type: 'edit_content',
+            contentId: doneId,
+            changes: [],
+            assetIds: [asset.id],
+            assetMode: 'append',
+            imagePrompt: null,
+          },
+        ],
+      };
+      provider.mockImplementationOnce(() => ({
+        partialOutputStream: (async function* () {
+          await Promise.resolve();
+          yield { text: output.text };
+        })(),
+        output: Promise.resolve(output),
+        finishReason: Promise.resolve('stop'),
+        usage: Promise.resolve({ inputTokens: 10, outputTokens: 5 }),
+      }));
+      const beforeContent = await prisma.contentItem.count({
+        where: { projectId: project },
+      });
+      const result = done((await send().expect(200)).text);
+      expect(
+        result.assistantMessage.actions.map((action) => action.type),
+      ).toEqual(['create_draft', 'edit_content']);
+      expect(
+        result.assistantMessage.actions.every(
+          (action) => action.status === 'proposed',
+        ),
+      ).toBe(true);
+      expect(
+        await prisma.contentItem.count({ where: { projectId: project } }),
+      ).toBe(beforeContent);
+      expect(
+        await prisma.contentAsset.count({ where: { contentId: readyId } }),
+      ).toBe(0);
+      expect(
+        await prisma.generation.count({
+          where: { userId: ids[pro], kind: 'IMAGE' },
+        }),
+      ).toBe(0);
+    });
+
     it('action state moves only from proposed, including concurrent PATCH; does not apply the proposal', async () => {
       const action = lastDone.assistantMessage.actions[0];
       const route = `${path()}/${lastDone.assistantMessage.id}/actions/${action.id}`;
@@ -487,6 +695,8 @@ suite(
         body: 'Bài quá ngắn',
         hashtags: ['ThẻMột', 'ThẻHai'],
         cta: 'Khám phá ngay',
+        assetIds: null,
+        imagePrompt: null,
       };
       for (const body of [
         draft.body,

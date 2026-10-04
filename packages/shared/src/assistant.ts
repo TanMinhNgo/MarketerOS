@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CreateContentSchema } from './content';
 import { UpsertBrandBriefFieldsSchema } from './core';
+import { GenerateImageInputSchema } from './media';
 
 const id = z.string().min(1).max(100);
 export const AssistantActionStatusSchema = z.enum([
@@ -9,9 +10,24 @@ export const AssistantActionStatusSchema = z.enum([
   'dismissed',
 ]);
 const base = { id, status: AssistantActionStatusSchema };
+const mediaIds = z
+  .array(id)
+  .max(10)
+  .refine((ids) => new Set(ids).size === ids.length, 'Duplicate asset ID.');
+const imagePrompt = z.string().trim().min(1).max(2000);
 const draft = CreateContentSchema.omit({ generationId: true })
-  .extend({ ...base, type: z.literal('create_draft') })
-  .strict();
+  .extend({
+    ...base,
+    type: z.literal('create_draft'),
+    assetIds: mediaIds.optional(),
+    imagePrompt: imagePrompt.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      (value.assetIds?.length ?? 0) + Number(Boolean(value.imagePrompt)) <= 10,
+    'At most 10 images may be attached.',
+  );
 const schedule = z
   .object({
     ...base,
@@ -46,27 +62,79 @@ const edit = CreateContentSchema.pick({
     cta: CreateContentSchema.shape.cta.removeDefault(),
   })
   .partial()
-  .extend({ ...base, type: z.literal('edit_content'), contentId: id })
+  .extend({
+    ...base,
+    type: z.literal('edit_content'),
+    contentId: id,
+    assetIds: mediaIds.optional(),
+    assetMode: z.enum(['append', 'replace']).optional(),
+    imagePrompt: imagePrompt.optional(),
+  })
   .strict();
-const hasEdit = (value: object) =>
-  ['title', 'body', 'hashtags', 'cta'].some((field) => field in value);
+const hasEdit = (value: { assetIds?: string[]; imagePrompt?: string }) =>
+  ['title', 'body', 'hashtags', 'cta'].some((field) => field in value) ||
+  Boolean(value.assetIds?.length || value.imagePrompt);
+const validEditImages = (value: {
+  assetIds?: string[];
+  assetMode?: 'append' | 'replace';
+  imagePrompt?: string;
+}) =>
+  value.assetMode !== 'replace' ||
+  (value.assetIds?.length ?? 0) + Number(Boolean(value.imagePrompt)) <= 10;
+const generateImage = GenerateImageInputSchema.extend({
+  ...base,
+  type: z.literal('generate_image'),
+  attachToContentId: id.optional(),
+}).strict();
+const attachMedia = z
+  .object({
+    ...base,
+    type: z.literal('attach_media'),
+    contentId: id,
+    assetIds: z
+      .array(id)
+      .min(1)
+      .max(10)
+      .refine((ids) => new Set(ids).size === ids.length, 'Duplicate asset ID.'),
+    mode: z.enum(['append', 'replace']),
+  })
+  .strict();
 
 export const AssistantActionSchema = z.discriminatedUnion('type', [
   draft,
   schedule,
   brief,
-  edit.refine(hasEdit, 'Cần ít nhất một trường nội dung.'),
+  edit
+    .refine(hasEdit, 'Cần ít nhất một trường nội dung hoặc ảnh.')
+    .refine(validEditImages, 'At most 10 images may be attached.'),
+  generateImage,
+  attachMedia,
 ]);
 export type AssistantAction = z.infer<typeof AssistantActionSchema>;
 export type AssistantActionStatus = z.infer<typeof AssistantActionStatusSchema>;
 // IDs and status belong to the server, not the model.
 export const AssistantProposedActionSchema = z.discriminatedUnion('type', [
-  draft.omit({ id: true, status: true }),
+  CreateContentSchema.omit({ generationId: true })
+    .extend({
+      type: z.literal('create_draft'),
+      assetIds: mediaIds.optional(),
+      imagePrompt: imagePrompt.optional(),
+    })
+    .strict()
+    .refine(
+      (value) =>
+        (value.assetIds?.length ?? 0) + Number(Boolean(value.imagePrompt)) <=
+        10,
+      'At most 10 images may be attached.',
+    ),
   schedule.omit({ id: true, status: true }),
   brief.omit({ id: true, status: true }),
   edit
     .omit({ id: true, status: true })
-    .refine(hasEdit, 'Cần ít nhất một trường nội dung.'),
+    .refine(hasEdit, 'Cần ít nhất một trường nội dung hoặc ảnh.')
+    .refine(validEditImages, 'At most 10 images may be attached.'),
+  generateImage.omit({ id: true, status: true }),
+  attachMedia.omit({ id: true, status: true }),
 ]);
 export const AssistantOutputSchema = z
   .object({

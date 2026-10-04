@@ -7,6 +7,8 @@ export * from './billing';
 export * from './assistant';
 export * from './content';
 export * from './automation';
+export * from './integrations';
+export * from './media';
 
 export const HealthResponseSchema = z.object({
   status: z.literal('ok'),

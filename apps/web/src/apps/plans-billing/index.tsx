@@ -26,11 +26,12 @@ function Usage() {
   const { data, isPending, error } = useUsage();
   if (isPending) return <Muted>Loading usage…</Muted>;
   if (error) return <Muted>{errorMessage(error)}</Muted>;
-  const { projects, text, assistant, automations, automationRuns } = data.usage;
+  const { projects, text, images, assistant, automations, automationRuns } = data.usage;
   return (
     <div className="space-y-4">
       <Meter label="Active projects" used={projects.used} limit={projects.limit} hint="Projects in Trash don't count." />
       <Meter label="AI generations this month" used={text.used} limit={text.limit} hint={`One generation writes 3 variants; every 3 single-variant regenerates count as 1. Resets ${fmt(new Date(data.period.end))}.`} />
+      {images && <Meter label="AI images this month" used={images.used} limit={images.limit} hint={`Images created with AI. Uploads don't count. Resets ${fmt(new Date(data.period.end))}.`} />}
       {assistant && <Meter label="AI Assistant messages this month" used={assistant.used} limit={assistant.limit} hint={`Messages you send to the assistant. Resets ${fmt(new Date(data.period.end))}.`} />}
       {automations && <Meter label="Automations turned on" used={automations.used} limit={automations.limit} hint="Across all projects. Paused automations don't count." />}
       {automationRuns && <Meter label="Automation runs this month" used={automationRuns.used} limit={automationRuns.limit} hint={`Scheduled runs and Run now, including failed or skipped ones. Resets ${fmt(new Date(data.period.end))}.`} />}

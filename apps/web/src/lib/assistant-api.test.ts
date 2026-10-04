@@ -4,7 +4,7 @@ import type { AssistantAction, BrandBriefResponse, ContentResponse } from "@mark
 vi.mock("@clerk/nextjs", () => ({ getToken: vi.fn(async () => "t") }));
 
 import { ApiError } from "./api-client";
-import { applyAction, mergeBrief, sendMessage } from "./assistant-api";
+import { applyAction, mergeAssetIds, mergeBrief, sendMessage } from "./assistant-api";
 
 const content = (status: ContentResponse["status"], scheduledAt: string | null = null): ContentResponse => ({
   id: "c1", projectId: "p", generationId: null, channel: "FACEBOOK", title: "T", body: "B", hashtags: [], cta: null, status, scheduledAt, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z",
@@ -67,6 +67,71 @@ describe("applyAction", () => {
     expect(writes[0].method).toBe("PUT");
     expect(writes[0].body).toMatchObject({ product: "P", tone: "bold", keyMessages: ["k"], language: "vi" });
     expect(writes[0].body).not.toHaveProperty("id");
+  });
+});
+
+describe("ảnh (attach_media / generate_image)", () => {
+  const asset = (id: string) => ({ id, projectId: "p", generationId: null, kind: "IMAGE", name: id, mimeType: "image/png", byteSize: "10", width: 1, height: 1, altText: null, createdAt: at, updatedAt: at });
+
+  it("mergeAssetIds: append giữ ảnh cũ, bỏ trùng, thêm cuối; replace thay hết; quá 10 thì báo lỗi", () => {
+    expect(mergeAssetIds(["a", "b"], ["b", "c"], "append")).toEqual(["a", "b", "c"]);
+    expect(mergeAssetIds(["a", "b"], ["c"], "replace")).toEqual(["c"]);
+    expect(() => mergeAssetIds(Array.from({ length: 9 }, (_, i) => `x${i}`), ["y", "z"], "append")).toThrow(ApiError);
+  });
+
+  it("gắn ảnh (append): đọc ảnh hiện có rồi PUT danh sách đã ghép", async () => {
+    const writes: { method: string; url: string; body: unknown }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      if ((init.method ?? "GET") === "GET") return Response.json({ items: [asset("a")] });
+      writes.push({ method: init.method!, url, body: JSON.parse(String(init.body)) });
+      return Response.json({ items: [] });
+    }));
+    await applyAction("p", { type: "attach_media", id: "x", status: "proposed", contentId: "c1", assetIds: ["a", "b"], mode: "append" });
+    expect(writes).toEqual([{ method: "PUT", url: "/api/projects/p/contents/c1/assets", body: { assetIds: ["a", "b"] } }]);
+  });
+
+  it("tạo nháp kèm ảnh: tạo bài → tạo ảnh mới → gắn ảnh có sẵn + ảnh mới (replace)", async () => {
+    const calls: string[] = [];
+    let put: unknown;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const method = init.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      if (url.endsWith("/images/generate")) return Response.json(asset("new"), { status: 201 });
+      if (url.endsWith("/contents")) return Response.json(content("DRAFT"), { status: 201 });
+      put = JSON.parse(String(init.body));
+      return Response.json({ items: [] });
+    }));
+    await applyAction("p", { type: "create_draft", id: "x", status: "proposed", channel: "FACEBOOK", title: "T", body: "B", hashtags: [], cta: null, assetIds: ["a"], imagePrompt: "Coffee" });
+    expect(calls).toEqual(["POST /api/projects/p/contents", "POST /api/projects/p/images/generate", "PUT /api/projects/p/contents/c1/assets"]);
+    expect(put).toEqual({ assetIds: ["a", "new"] });
+  });
+
+  it("sửa bài chỉ có ảnh: không PATCH nội dung, chỉ ghép ảnh (append)", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const method = init.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      return Response.json({ items: method === "GET" ? [asset("old")] : [] });
+    }));
+    await applyAction("p", { type: "edit_content", id: "x", status: "proposed", contentId: "c1", assetIds: ["b"] });
+    expect(calls).toEqual(["GET /api/projects/p/contents/c1/assets", "PUT /api/projects/p/contents/c1/assets"]);
+  });
+
+  it("tạo ảnh có bài đích: POST generate (Idempotency-Key) rồi thêm ảnh mới vào cuối bài", async () => {
+    const calls: { method: string; url: string; key?: string }[] = [];
+    let put: unknown;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const method = init.method ?? "GET";
+      calls.push({ method, url, key: (init.headers as Record<string, string>)["Idempotency-Key"] });
+      if (url.endsWith("/images/generate")) return Response.json(asset("new"), { status: 201 });
+      if (method === "GET") return Response.json({ items: [asset("old")] });
+      put = JSON.parse(String(init.body));
+      return Response.json({ items: [] });
+    }));
+    await applyAction("p", { type: "generate_image", id: "x", status: "proposed", prompt: "Coffee", size: "1024x1024", attachToContentId: "c1" });
+    expect(calls[0]).toMatchObject({ method: "POST", url: "/api/projects/p/images/generate" });
+    expect(calls[0].key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(put).toEqual({ assetIds: ["old", "new"] });
   });
 });
 

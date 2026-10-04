@@ -32,6 +32,7 @@ export class BillingService {
       usage: {
         projects: { used: counts.projects, limit: limits.projects },
         text: { used: counts.text, limit: limits.text },
+        images: { used: counts.images, limit: limits.images },
         ...(includeAssistant
           ? {
               assistant: {

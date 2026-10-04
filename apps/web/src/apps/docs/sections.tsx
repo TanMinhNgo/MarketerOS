@@ -259,6 +259,8 @@ export const SECTIONS: DocSection[] = [
             ["Edit a post", "Updates the post. An approved post goes back to Needs review."],
             ["Schedule", "Puts an approved post on the calendar, or moves its date. Posts that still need review can't be scheduled."],
             ["Brand Brief change", "Updates only the fields shown; everything else in the brief stays the same."],
+            ["Create an image", "Creates the described image in your brief's style (uses 1 AI image) and saves it to the Media Library; it can also add it to a post."],
+            ["Add images to a post", "Adds images from the Media Library to a post, or replaces its images. An approved post goes back to Needs review."],
           ]}
         />
         <Callout kind="note">The assistant never approves, deletes or marks posts as Done. Pro includes {PLAN_LIMITS.pro.assistant} messages a month; your usage is in Plans &amp; Billing. Clear deletes the project&apos;s chat history but doesn&apos;t give messages back.</Callout>
@@ -305,10 +307,51 @@ export const SECTIONS: DocSection[] = [
             ["Posts by channel", "How many posts each channel has, split by status."],
             ["Next 4 weeks", "Scheduled posts per week, starting Monday. Empty weeks are flagged so you can fill them."],
             ["AI usage this month", "Generations, AI Assistant messages and automation runs, across all projects."],
-            ["Export CSV", "Downloads every post of the project (title, channel, status, dates, text, hashtags, call to action) as a CSV file that opens in Excel or Google Sheets."],
+            ["Content performance", "Views, unique views, likes, comments and shares of posts published from MarketOS to Facebook (refreshed every 6 hours). LinkedIn doesn't share post stats with apps."],
+            ["Export CSV", "Downloads every post of the project (title, channel, status, dates, text, hashtags, call to action, post link and latest stats) as a CSV file that opens in Excel or Google Sheets."],
           ]}
         />
         <Callout kind="note">Views, clicks and engagement per post will come once channels can be connected in Integrations.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "media",
+    title: "Media Library",
+    summary: "Upload images or create them with AI, then attach them to posts.",
+    body: (
+      <>
+        <P>Each project keeps its own images. Uploads can be PNG, JPEG or WebP up to 10 MB.</P>
+        <Steps>
+          <Step title="Add images">Press <strong>Upload</strong> or drop files on the Media Library window. Press <strong>Create with AI</strong> to describe an image; it follows the visual style and brand colors in your Brand Brief.</Step>
+          <Step title="Attach to a post">In Content Studio (Edit) or on the calendar, open a post and press <strong>Add images</strong>. Pick up to 10, in the order they should appear.</Step>
+          <Step title="Review again">Changing the images of an approved post sends it back to Needs review, so you see the final version before it goes out.</Step>
+        </Steps>
+        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Facebook and LinkedIn publishing sends text only for now.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "integrations",
+    title: "Integrations",
+    summary: "Connect Facebook and LinkedIn and publish approved posts (Pro).",
+    body: (
+      <>
+        <P>Integrations are part of <strong>Pro</strong> and <strong>Max</strong>. Each project connects its own accounts: one Facebook Page and one LinkedIn profile.</P>
+        <Steps>
+          <Step title="Connect">Open Integrations and press Connect. Sign in on Facebook or LinkedIn and allow posting. If you manage several Facebook Pages, choose one.</Step>
+          <Step title="Approve and schedule">Approve a post and put it on the Content Calendar. Posts that still need review are never published.</Step>
+          <Step title="It publishes">At the scheduled time MarketOS posts it, marks it Done and adds a link to the live post. Press <strong>Publish now</strong> to post an approved one straight away.</Step>
+        </Steps>
+        <Table
+          head={["If you see", "What to do"]}
+          rows={[
+            ["Expired / Reconnect", "The account's access ran out (LinkedIn asks every 60 days). Press Reconnect."],
+            ["Couldn't publish", "Read the reason on the post. If the platform had a problem, check the account first: the post may already be live."],
+            ["Disconnect", "Scheduled posts for that channel stop publishing. Posts already published stay where they are."],
+          ]}
+        />
+        <Callout kind="note">Instagram, TikTok and YouTube need images or video, so they come after the Media Library.</Callout>
       </>
     ),
   },

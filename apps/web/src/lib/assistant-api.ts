@@ -3,7 +3,9 @@ import {
   AssistantMessageDeltaSchema,
   AssistantMessageSchema,
   AssistantMessagesResponseSchema,
+  AssetSchema,
   BrandBriefResponseSchema,
+  ContentAssetsResponseSchema,
   ContentResponseSchema,
   UpsertBrandBriefSchema,
   type AssistantAction,
@@ -63,25 +65,70 @@ export async function applyAction(projectId: string, action: AssistantAction): P
   switch (action.type) {
     case "create_draft": {
       const { channel, title, body, hashtags, cta } = action;
-      await api(contents, ContentResponseSchema, { method: "POST", body: { channel, title, body, hashtags, cta } });
+      const created = await api(contents, ContentResponseSchema, { method: "POST", body: { channel, title, body, hashtags, cta } });
+      await addImages(projectId, created.id, action, "replace", title);
       return;
     }
     case "edit_content": {
       const fields = Object.fromEntries(CONTENT_FIELDS.filter((f) => f in action).map((f) => [f, action[f]]));
-      await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: fields });
+      if (Object.keys(fields).length) await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: fields });
+      await addImages(projectId, action.contentId, action, action.assetMode ?? "append");
       return;
     }
-    case "schedule": {
-      const item = await api(`${contents}/${action.contentId}`, ContentResponseSchema);
-      const patch = schedulePatch(item, item.status === "READY" ? "SCHEDULED" : item.status, action.scheduledAt);
-      if (typeof patch === "string") throw new ApiError(409, "CONFLICT", patch);
-      if (patch) await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: patch });
-      return;
-    }
+    case "schedule":
+      return applySchedule(`${contents}/${action.contentId}`, action.scheduledAt);
     case "update_brief": {
       const brief = await api(`/api/projects/${projectId}/brand-brief`, BrandBriefResponseSchema);
       await api(`/api/projects/${projectId}/brand-brief`, BrandBriefResponseSchema, { method: "PUT", body: mergeBrief(brief, action.changes) });
       return;
     }
+    case "generate_image": {
+      const id = await generateAsset(projectId, action.prompt, action.name, action.size);
+      if (action.attachToContentId) await attachAssets(projectId, action.attachToContentId, [id], "append");
+      return;
+    }
+    case "attach_media":
+      await attachAssets(projectId, action.contentId, action.assetIds, action.mode);
+      return;
   }
+}
+
+/** Lên lịch / dời lịch bài đã duyệt; bài chưa duyệt bị từ chối (schedulePatch trả thông báo lỗi). */
+async function applySchedule(path: string, scheduledAt: string) {
+  const item = await api(path, ContentResponseSchema);
+  const patch = schedulePatch(item, item.status === "READY" ? "SCHEDULED" : item.status, scheduledAt);
+  if (typeof patch === "string") throw new ApiError(409, "CONFLICT", patch);
+  if (patch) await api(path, ContentResponseSchema, { method: "PATCH", body: patch });
+}
+
+/** Ảnh kèm bài trong đề xuất: ảnh có sẵn + (nếu có) một ảnh AI mới, rồi gắn vào bài theo `mode`. */
+async function addImages(projectId: string, contentId: string, a: { assetIds?: string[]; imagePrompt?: string }, mode: "append" | "replace", name?: string) {
+  const ids = [...(a.assetIds ?? [])];
+  if (a.imagePrompt) ids.push(await generateAsset(projectId, a.imagePrompt, name));
+  if (ids.length) await attachAssets(projectId, contentId, ids, mode);
+}
+
+export const MAX_IMAGES = 10;
+
+/** Tạo một ảnh AI (tốn 1 lượt ảnh, Idempotency-Key mới mỗi lần Apply), trả về ID ảnh. */
+async function generateAsset(projectId: string, prompt: string, name?: string, size = "1024x1024"): Promise<string> {
+  const res = await request(`/api/projects/${projectId}/images/generate`, {
+    method: "POST",
+    body: { prompt, size, ...(name ? { name: name.slice(0, 200) } : {}) },
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+  });
+  return AssetSchema.parse(await res.json()).id;
+}
+
+/** Ghép ảnh vào bài: `append` giữ ảnh cũ (bỏ trùng) rồi thêm vào cuối, `replace` thay toàn bộ. Backend kiểm ownership/DONE. */
+export function mergeAssetIds(current: string[], ids: string[], mode: "append" | "replace"): string[] {
+  const next = mode === "replace" ? ids : [...current, ...ids.filter((id) => !current.includes(id))];
+  if (next.length > MAX_IMAGES) throw new ApiError(400, "VALIDATION", `A post can have up to ${MAX_IMAGES} images. Remove some first.`);
+  return next;
+}
+
+async function attachAssets(projectId: string, contentId: string, ids: string[], mode: "append" | "replace") {
+  const path = `/api/projects/${projectId}/contents/${contentId}/assets`;
+  const current = mode === "replace" ? [] : (await api(path, ContentAssetsResponseSchema)).items.map((a) => a.id);
+  await api(path, ContentAssetsResponseSchema, { method: "PUT", body: { assetIds: mergeAssetIds(current, ids, mode) } });
 }

@@ -15,14 +15,15 @@ const SHIPPED = [
   "Automations that write drafts, schedule approved posts and send weekly reports (Max)",
   "Reports: where each project's posts stand and what's scheduled for the next 4 weeks",
   "Settings for the beach scene, animations, notifications and window layout",
+  "Media Library: upload images or create them with AI in your brand's style, and attach them to posts",
+  "Integrations (Pro): connect a Facebook Page and LinkedIn, auto-publish approved posts, Facebook stats in Reports",
   "AI Assistant (Pro): chat per project, with suggested drafts, edits and schedules you apply in one click",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
 ];
 
 const NEXT = [
-  { name: "Integrations", note: "Connect social channels, then see how each post performs in Reports." },
-  { name: "Media Library", note: "AI images and your own uploads, attached to posts." },
+  { name: "Publishing with images", note: "Send a post's images to Facebook and LinkedIn, then Instagram, TikTok and YouTube." },
 ];
 
 const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "TanStack Query", "NestJS", "PostgreSQL", "Clerk", "OpenAI"];

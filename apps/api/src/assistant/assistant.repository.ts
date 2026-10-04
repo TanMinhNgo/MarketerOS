@@ -180,6 +180,46 @@ export class AssistantRepository {
       select: { id: true, status: true },
     });
   }
+  async mediaContext(projectId: string, userId: string, contentIds: string[]) {
+    const project = { ownerId: userId, deletedAt: null };
+    const [assets, links] = await Promise.all([
+      this.prisma.asset.findMany({
+        where: { projectId, project },
+        select: {
+          id: true,
+          name: true,
+          kind: true,
+          generationId: true,
+          altText: true,
+          width: true,
+          height: true,
+          createdAt: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 30,
+      }),
+      this.prisma.contentAsset.findMany({
+        where: {
+          contentId: { in: contentIds },
+          content: { projectId, project },
+          asset: { projectId },
+        },
+        select: { contentId: true, assetId: true, position: true },
+        orderBy: [{ contentId: 'asc' }, { position: 'asc' }],
+      }),
+    ]);
+    return { assets, links };
+  }
+  assets(projectId: string, userId: string, ids: string[]) {
+    return this.prisma.asset.findMany({
+      where: {
+        id: { in: ids },
+        projectId,
+        project: { ownerId: userId, deletedAt: null },
+      },
+      select: { id: true },
+    });
+  }
   finish(
     projectId: string,
     userId: string,

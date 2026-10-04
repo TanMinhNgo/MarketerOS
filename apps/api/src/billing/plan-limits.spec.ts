@@ -3,13 +3,14 @@ import { PlanLimitDetailsSchema } from '@marketos/shared';
 import { PLAN_LIMITS } from './plan-limits';
 import { requireFeature } from '../auth/require-feature';
 
-test('only confirmed project and TEXT limits are configured', () => {
+test('project, TEXT and IMAGE limits are configured', () => {
   expect(PLAN_LIMITS).toEqual({
-    free: { projects: 3, text: 10 },
-    pro: { projects: 20, text: 200, assistant: 300 },
+    free: { projects: 3, text: 10, images: 5 },
+    pro: { projects: 20, text: 200, images: 50, assistant: 300 },
     max: {
       projects: 50,
       text: 500,
+      images: 200,
       assistant: 1000,
       automations: 10,
       automationRuns: 60,

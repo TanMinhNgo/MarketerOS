@@ -10,6 +10,7 @@ import { api, errorMessage } from "@/lib/api-client";
 import { STATUS_LABEL, type ContentStatus } from "@/lib/calendar-api";
 import { keys, useProjects, useUsage } from "@/lib/queries";
 import { normalize } from "@/desktop/search/search-index";
+import { latestFor, metric, useCanPublish, usePublications, type Publication } from "@/lib/integrations-api";
 import { notify } from "@/lib/notify/notify";
 import { useActiveProject } from "@/stores/active-project";
 import { channelColor } from "../content-calendar/channel-colors";
@@ -72,7 +73,84 @@ function weekLabel(i: number, start: Date) {
   return `${day.format(start)} – ${day.format(end)}`;
 }
 
-function Overview({ s }: Readonly<{ s: ContentSummary }>) {
+const COLS = [
+  ["impressions", "Views"],
+  ["reach", "Unique views"],
+  ["likes", "Likes"],
+  ["comments", "Comments"],
+  ["shares", "Shares"],
+] as const;
+const num = new Intl.NumberFormat("en-US");
+
+/** Số liệu bài đã đăng (lần đo mới nhất). Chỉ Facebook có số liệu; LinkedIn không chia sẻ với app. */
+function Performance({ projectId }: Readonly<{ projectId: string }>) {
+  const open = useWindowStore((st) => st.open);
+  const canPublish = useCanPublish();
+  const pubs = usePublications(projectId);
+  const published = pubs.data?.filter((p) => p.status === "PUBLISHED") ?? [];
+  const total = (k: (typeof COLS)[number][0]) => published.reduce((n, p) => n + (metric(p.latestMetric?.[k]) ?? 0), 0);
+  const cell = (v: string | null | undefined) => {
+    const n = metric(v);
+    return n == null ? "—" : num.format(n);
+  };
+
+  let body: React.ReactNode;
+  if (!canPublish) body = <p className="text-sm text-muted-foreground">Part of Pro and Max: connect Facebook or LinkedIn, publish on schedule, and see each post&apos;s numbers here.</p>;
+  else if (pubs.isPending) body = <p className="text-sm text-muted-foreground">Loading…</p>;
+  else if (pubs.error) body = <p className="text-sm text-destructive">{errorMessage(pubs.error)}</p>;
+  else if (!published.length)
+    body = (
+      <p className="text-sm text-muted-foreground">
+        Nothing published from MarketOS yet. Connect a channel, then approved posts publish at their scheduled time.{" "}
+        <Button size="xs" variant="link" className="h-auto p-0" onClick={() => open("integrations")}>Open Integrations</Button>
+      </p>
+    );
+  else
+    body = (
+      <>
+        <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-5">
+          {COLS.map(([k, label]) => (
+            <div key={k} className="rounded-xl bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="font-display text-2xl font-bold tabular-nums">{num.format(total(k))}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-xl border">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-3 py-2 font-semibold">Post</th>
+                <th scope="col" className="px-3 py-2 font-semibold">Published</th>
+                {COLS.map(([k, label]) => <th key={k} scope="col" className="px-3 py-2 text-right font-semibold">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {published.map((p) => (
+                <tr key={p.id}>
+                  <th scope="row" className="max-w-64 px-3 py-2 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="size-2.5 shrink-0 rounded-full" style={{ background: channelColor(p.channel) }} title={channelLabel(p.channel)} aria-hidden="true" />
+                      {p.externalUrl ? <a href={p.externalUrl} target="_blank" rel="noopener noreferrer" className="truncate underline">{p.title}</a> : <span className="truncate">{p.title}</span>}
+                    </span>
+                  </th>
+                  <td className="whitespace-nowrap px-3 py-2">{p.publishedAt ? day.format(new Date(p.publishedAt)) : "—"}</td>
+                  {COLS.map(([k]) => (
+                    <td key={k} className="px-3 py-2 text-right tabular-nums" title={p.channel === "LINKEDIN" ? "LinkedIn doesn't share post stats" : undefined}>{cell(p.latestMetric?.[k])}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Facebook numbers refresh every 6 hours for posts from the last 30 days. LinkedIn doesn&apos;t share post stats with apps, so its rows show —.</p>
+      </>
+    );
+
+  return <Card icon={TrendingUp} title="Content performance">{body}</Card>;
+}
+
+function Overview({ projectId, s }: Readonly<{ projectId: string; s: ContentSummary }>) {
   const open = useWindowStore((st) => st.open);
   const usage = useUsage().data?.usage;
   const channelMax = Math.max(1, ...s.channels.map((c) => c.total));
@@ -120,26 +198,22 @@ function Overview({ s }: Readonly<{ s: ContentSummary }>) {
         <Card icon={ChartNoAxesColumn} title="AI usage this month" action={<Button size="xs" variant="ghost" onClick={() => open("plans-billing")}>Plans &amp; Billing</Button>}>
           <div className="space-y-4">
             <Meter label="AI generations" used={usage.text.used} limit={usage.text.limit} hint="Across all projects." />
+            {usage.images && <Meter label="AI images" used={usage.images.used} limit={usage.images.limit} hint="Across all projects." />}
             {usage.assistant && <Meter label="AI Assistant messages" used={usage.assistant.used} limit={usage.assistant.limit} hint="Across all projects." />}
             {usage.automationRuns && <Meter label="Automation runs" used={usage.automationRuns.used} limit={usage.automationRuns.limit} hint="Across all projects." />}
           </div>
         </Card>
       )}
 
-      <Card icon={TrendingUp} title="Content performance">
-        <p className="text-sm text-muted-foreground">
-          <span className="mr-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">Coming soon</span>{" "}
-          Views, clicks and engagement per post will appear here once you can connect your channels in Integrations.
-        </p>
-      </Card>
+      <Performance projectId={projectId} />
     </>
   );
 }
 
 /** Tải file CSV mọi bài của dự án; Excel / Google Sheets mở trực tiếp. */
-function exportPosts(name: string, items: ContentResponse[]) {
+function exportPosts(name: string, items: ContentResponse[], published: (contentId: string) => Publication | undefined) {
   const slug = normalize(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
-  downloadCsv(`marketos-${slug}-posts-${new Date().toISOString().slice(0, 10)}.csv`, postsCsv(items));
+  downloadCsv(`marketos-${slug}-posts-${new Date().toISOString().slice(0, 10)}.csv`, postsCsv(items, published));
   notify.success("Report exported", { description: `${items.length} posts. Open the file in Excel or Google Sheets.` });
 }
 
@@ -147,6 +221,7 @@ function ProjectReport({ projectId, name }: Readonly<{ projectId: string; name: 
   const open = useWindowStore((s) => s.open);
   // Nằm dưới key contents(projectId) nên lưu / sửa / xoá bài ở app khác cũng làm mới báo cáo.
   const all = useQuery({ queryKey: [...keys.contents(projectId), "all"], queryFn: () => fetchAll(projectId) });
+  const pubs = usePublications(projectId);
 
   return (
     <div className="@container mx-auto w-11/12 space-y-4 py-5">
@@ -155,7 +230,7 @@ function ProjectReport({ projectId, name }: Readonly<{ projectId: string; name: 
           <h2 className="font-display text-xl font-bold">Reports · {name}</h2>
           <p className="text-sm text-muted-foreground">Where this project&apos;s posts stand, and what&apos;s coming up.</p>
         </div>
-        <Button variant="outline" disabled={!all.data?.length} onClick={() => all.data && exportPosts(name, all.data)}>
+        <Button variant="outline" disabled={!all.data?.length} onClick={() => all.data && exportPosts(name, all.data, (id) => latestFor(pubs.data, id))}>
           <Download /> Export CSV
         </Button>
       </header>
@@ -174,7 +249,7 @@ function ProjectReport({ projectId, name }: Readonly<{ projectId: string; name: 
           <Button className="mt-3" onClick={() => open("content-studio")}><Sparkles /> Open Content Studio</Button>
         </div>
       )}
-      {!!all.data?.length && <Overview s={summarize(all.data)} />}
+      {!!all.data?.length && <Overview projectId={projectId} s={summarize(all.data)} />}
     </div>
   );
 }
