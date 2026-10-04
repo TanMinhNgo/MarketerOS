@@ -1,6 +1,6 @@
 "use client";
 
-import { GenerateContentInputSchema, type ContentLanguage, type GeneratedVariant } from "@marketos/shared";
+import { ContentAssetsResponseSchema, GenerateContentInputSchema, type ContentLanguage, type GeneratedVariant } from "@marketos/shared";
 import { Sparkles, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { notify } from "@/lib/notify/notify";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { selectFocusedId, useWindowStore } from "@/desktop/window-store";
-import { errorMessage } from "@/lib/api-client";
+import { api, errorMessage } from "@/lib/api-client";
 import { LANGUAGES } from "@/lib/languages";
 import { useQueryClient } from "@tanstack/react-query";
 import { keys, useSaveContent, useUsage } from "@/lib/queries";
@@ -82,10 +82,17 @@ export function Studio({ projectId, projectName, language }: { projectId: string
     );
 
   // Kênh lấy từ lần tạo (form có thể đã đổi sau đó), generationId theo từng biến thể.
-  const saveVariant = async (v: GeneratedVariant, generationId: string | null) => {
+  // Lưu nháp rồi gắn ảnh đã chọn (nếu có). Gắn ảnh lỗi thì bài vẫn đã lưu: báo để người dùng thêm lại trong Edit.
+  const saveVariant = async (v: GeneratedVariant, generationId: string | null, assetIds: string[]) => {
     await save
       .mutateAsync({ channel: state.input?.channel ?? channel, title: v.title, body: v.body, hashtags: v.hashtags, cta: v.cta ? v.cta : null, generationId })
-      .then(() => notify.success("Saved to drafts", { description: "Find it in Saved drafts and on the Content Calendar." }))
+      .then(async (created) => {
+        if (assetIds.length)
+          await api(`/api/projects/${projectId}/contents/${created.id}/assets`, ContentAssetsResponseSchema, { method: "PUT", body: { assetIds } }).catch((e: unknown) =>
+            notify.apiError("Saved, but the images weren't attached", e),
+          );
+        notify.success("Saved to drafts", { description: assetIds.length ? `With ${assetIds.length} image${assetIds.length > 1 ? "s" : ""}. Find it in Saved drafts and on the Content Calendar.` : "Find it in Saved drafts and on the Content Calendar." });
+      })
       .catch(() => {
         // lỗi đã hiện bằng toast từ MutationCache; ném lại để thẻ không báo "đã lưu"
         throw new Error("save failed");
@@ -161,7 +168,8 @@ export function Studio({ projectId, projectName, language }: { projectId: string
                   index={i}
                   state={v}
                   saving={save.isPending}
-                  onSave={(data) => saveVariant(data, v.generationId)}
+                  projectId={projectId}
+                  onSave={(data, assetIds) => saveVariant(data, v.generationId, assetIds)}
                   onRegenerate={isStreaming ? undefined : () => void regenerateVariant(i)}
                 />
               ))}

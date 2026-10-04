@@ -78,6 +78,8 @@ const APPLIED: Record<AssistantAction["type"], Parameters<typeof notify.success>
   edit_content: ["Post updated", { action: { label: "Open Content Studio", appId: "content-studio" } }],
   schedule: ["Post scheduled", { action: { label: "Open calendar", appId: "content-calendar" } }],
   update_brief: ["Brand Brief updated", { action: { label: "Open Brand Brief", appId: "brand-brief" } }],
+  generate_image: ["Image created", { description: "It's in the Media Library.", action: { label: "Open Media Library", appId: "media-library" } }],
+  attach_media: ["Images added to the post", { action: { label: "Open Content Studio", appId: "content-studio" } }],
 };
 
 /** Hành động đã chạy nhưng không lưu được nhãn `applied`: không cho bấm Apply lại (tránh tạo trùng). */
@@ -86,7 +88,11 @@ export class AppliedButNotMarked extends Error {}
 /** Apply: chạy hành động bằng API sẵn có rồi mới đánh dấu `applied`; lỗi thì action vẫn `proposed`. */
 export function useActionStatus(projectId: string, messageId: string) {
   const qc = useQueryClient();
-  const refreshTargets = () => void Promise.all([qc.invalidateQueries({ queryKey: keys.contents(projectId) }), qc.invalidateQueries({ queryKey: keys.brief(projectId) })]);
+  // Apply có thể đổi bài, brief, thư viện ảnh / ảnh của bài và lượt ảnh AI.
+  const refreshTargets = () =>
+    void Promise.all(
+      [keys.contents(projectId), keys.brief(projectId), ["assets", projectId], ["content-assets", projectId], keys.usage].map((queryKey) => qc.invalidateQueries({ queryKey })),
+    );
   return useMutation({
     meta: { silent: true },
     mutationFn: async ({ action, status }: { action: AssistantAction; status: "applied" | "dismissed" }) => {

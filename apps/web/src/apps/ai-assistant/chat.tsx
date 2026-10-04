@@ -15,7 +15,7 @@ import { isQuotaError } from "../content-studio/use-generation";
 import { ActionCard } from "./action-card";
 import { useAssistant } from "./use-assistant";
 
-const SUGGESTIONS = ["Plan 5 posts for next week", "Which approved posts aren't scheduled yet?", "How could my Brand Brief be sharper?", "Rewrite my latest draft to be shorter"];
+const SUGGESTIONS = ["Plan 5 posts for next week", "Which approved posts aren't scheduled yet?", "Create an image for my latest post", "Add images from my library to a draft", "How could my Brand Brief be sharper?", "Rewrite my latest draft to be shorter"];
 
 /** `enter`: trượt lên khi vừa gửi (chỉ tin đang gửi, không áp cho lịch sử tải về). */
 function Bubble({ mine, bare, enter, delay = 0, children }: Readonly<{ mine: boolean; bare?: boolean; enter?: boolean; delay?: number; children: React.ReactNode }>) {

@@ -3,7 +3,9 @@ import {
   AssistantMessageDeltaSchema,
   AssistantMessageSchema,
   AssistantMessagesResponseSchema,
+  AssetSchema,
   BrandBriefResponseSchema,
+  ContentAssetsResponseSchema,
   ContentResponseSchema,
   UpsertBrandBriefSchema,
   type AssistantAction,
@@ -63,12 +65,18 @@ export async function applyAction(projectId: string, action: AssistantAction): P
   switch (action.type) {
     case "create_draft": {
       const { channel, title, body, hashtags, cta } = action;
-      await api(contents, ContentResponseSchema, { method: "POST", body: { channel, title, body, hashtags, cta } });
+      const created = await api(contents, ContentResponseSchema, { method: "POST", body: { channel, title, body, hashtags, cta } });
+      const ids = [...(action.assetIds ?? [])];
+      if (action.imagePrompt) ids.push(await generateAsset(projectId, action.imagePrompt, title));
+      if (ids.length) await attachAssets(projectId, created.id, ids, "replace");
       return;
     }
     case "edit_content": {
       const fields = Object.fromEntries(CONTENT_FIELDS.filter((f) => f in action).map((f) => [f, action[f]]));
-      await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: fields });
+      if (Object.keys(fields).length) await api(`${contents}/${action.contentId}`, ContentResponseSchema, { method: "PATCH", body: fields });
+      const ids = [...(action.assetIds ?? [])];
+      if (action.imagePrompt) ids.push(await generateAsset(projectId, action.imagePrompt));
+      if (ids.length) await attachAssets(projectId, action.contentId, ids, action.assetMode ?? "append");
       return;
     }
     case "schedule": {
@@ -83,5 +91,38 @@ export async function applyAction(projectId: string, action: AssistantAction): P
       await api(`/api/projects/${projectId}/brand-brief`, BrandBriefResponseSchema, { method: "PUT", body: mergeBrief(brief, action.changes) });
       return;
     }
+    case "generate_image": {
+      const id = await generateAsset(projectId, action.prompt, action.name, action.size);
+      if (action.attachToContentId) await attachAssets(projectId, action.attachToContentId, [id], "append");
+      return;
+    }
+    case "attach_media":
+      await attachAssets(projectId, action.contentId, action.assetIds, action.mode);
+      return;
   }
+}
+
+export const MAX_IMAGES = 10;
+
+/** Tạo một ảnh AI (tốn 1 lượt ảnh, Idempotency-Key mới mỗi lần Apply), trả về ID ảnh. */
+async function generateAsset(projectId: string, prompt: string, name?: string, size = "1024x1024"): Promise<string> {
+  const res = await request(`/api/projects/${projectId}/images/generate`, {
+    method: "POST",
+    body: { prompt, size, ...(name ? { name: name.slice(0, 200) } : {}) },
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+  });
+  return AssetSchema.parse(await res.json()).id;
+}
+
+/** Ghép ảnh vào bài: `append` giữ ảnh cũ (bỏ trùng) rồi thêm vào cuối, `replace` thay toàn bộ. Backend kiểm ownership/DONE. */
+export function mergeAssetIds(current: string[], ids: string[], mode: "append" | "replace"): string[] {
+  const next = mode === "replace" ? ids : [...current, ...ids.filter((id) => !current.includes(id))];
+  if (next.length > MAX_IMAGES) throw new ApiError(400, "VALIDATION", `A post can have up to ${MAX_IMAGES} images. Remove some first.`);
+  return next;
+}
+
+async function attachAssets(projectId: string, contentId: string, ids: string[], mode: "append" | "replace") {
+  const path = `/api/projects/${projectId}/contents/${contentId}/assets`;
+  const current = mode === "replace" ? [] : (await api(path, ContentAssetsResponseSchema)).items.map((a) => a.id);
+  await api(path, ContentAssetsResponseSchema, { method: "PUT", body: { assetIds: mergeAssetIds(current, ids, mode) } });
 }
