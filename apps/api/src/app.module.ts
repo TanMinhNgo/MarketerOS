@@ -15,6 +15,7 @@ import { ContentModule } from './content/content.module';
 import { AiModule } from './ai/ai.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     AiModule,
     PrismaModule,
     IntegrationsModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

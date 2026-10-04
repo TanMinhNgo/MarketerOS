@@ -30,6 +30,12 @@ const EnvironmentSchema = z
       .or(z.literal('')),
     OPENAI_API_KEY: z.string().trim().min(1),
     AI_MODEL: z.string().trim().min(1),
+    IMAGE_MODEL: z.string().trim().min(1).default('gpt-image-2.5-sunburst'),
+    IMAGEKIT_PRIVATE_KEY: z.string().optional(),
+    IMAGEKIT_URL_ENDPOINT: z
+      .url({ protocol: /^https?$/ })
+      .optional()
+      .or(z.literal('')),
     REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
     META_APP_ID: z.string().optional(),
     META_APP_SECRET: z.string().optional(),

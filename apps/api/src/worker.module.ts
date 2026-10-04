@@ -11,6 +11,8 @@ import { AutomationWorker } from './automation/automation.worker';
 import { PromptBuilder } from './ai/prompt-builder';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PublicationWorker } from './integrations/publication.worker';
+import { MediaModule } from './media/media.module';
+import { MediaCleanupWorker } from './media/media-cleanup.worker';
 
 @Module({
   imports: [
@@ -24,11 +26,13 @@ import { PublicationWorker } from './integrations/publication.worker';
     AssistantModule,
     AutomationModule,
     IntegrationsModule,
+    MediaModule,
   ],
   providers: [
     AutomationExecutor,
     AutomationWorker,
     PublicationWorker,
+    MediaCleanupWorker,
     PromptBuilder,
   ],
 })

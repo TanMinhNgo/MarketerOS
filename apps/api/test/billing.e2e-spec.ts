@@ -259,7 +259,11 @@ suite('Billing limits with PostgreSQL', () => {
       plan: 'free',
       features: ['brand_brief'],
       period: { start: start.toISOString(), end: end.toISOString() },
-      usage: { projects: { used: 2, limit: 3 }, text: { used: 4, limit: 10 } },
+      usage: {
+        projects: { used: 2, limit: 3 },
+        text: { used: 4, limit: 10 },
+        images: { used: 1, limit: 5 },
+      },
     });
     const other = await request(app.getHttpServer())
       .get('/api/billing/usage')

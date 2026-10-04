@@ -19,6 +19,9 @@ export class BillingRepository {
           where: { ownerId: userId, deletedAt: null },
         });
         const text = await readTextUsage(tx, userId, start, end);
+        const images = await tx.generation.count({
+          where: { userId, kind: 'IMAGE', createdAt: { gte: start, lt: end } },
+        });
         const assistant = includeAssistant
           ? await readAssistantUsage(tx, userId, start, end)
           : undefined;
@@ -33,6 +36,7 @@ export class BillingRepository {
         return {
           projects,
           text: text.used,
+          images,
           assistant,
           automationRuns,
           automations,

@@ -333,6 +333,13 @@ model Asset {
   @@index([generationId])
 }
 
+/// Durable object cleanup outbox; populated by an Asset DELETE trigger, including cascades.
+model MediaDeletion {
+  id         Int      @id @default(autoincrement())
+  storageKey String   @unique
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+}
+
 model ContentAsset {
   contentId String
   content   ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
