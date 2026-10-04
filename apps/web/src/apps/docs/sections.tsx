@@ -259,6 +259,8 @@ export const SECTIONS: DocSection[] = [
             ["Edit a post", "Updates the post. An approved post goes back to Needs review."],
             ["Schedule", "Puts an approved post on the calendar, or moves its date. Posts that still need review can't be scheduled."],
             ["Brand Brief change", "Updates only the fields shown; everything else in the brief stays the same."],
+            ["Create an image", "Creates the described image in your brief's style (uses 1 AI image) and saves it to the Media Library; it can also add it to a post."],
+            ["Add images to a post", "Adds images from the Media Library to a post, or replaces its images. An approved post goes back to Needs review."],
           ]}
         />
         <Callout kind="note">The assistant never approves, deletes or marks posts as Done. Pro includes {PLAN_LIMITS.pro.assistant} messages a month; your usage is in Plans &amp; Billing. Clear deletes the project&apos;s chat history but doesn&apos;t give messages back.</Callout>
@@ -310,6 +312,22 @@ export const SECTIONS: DocSection[] = [
           ]}
         />
         <Callout kind="note">Views, clicks and engagement per post will come once channels can be connected in Integrations.</Callout>
+      </>
+    ),
+  },
+  {
+    id: "media",
+    title: "Media Library",
+    summary: "Upload images or create them with AI, then attach them to posts.",
+    body: (
+      <>
+        <P>Each project keeps its own images. Uploads can be PNG, JPEG or WebP up to 10 MB.</P>
+        <Steps>
+          <Step title="Add images">Press <strong>Upload</strong> or drop files on the Media Library window. Press <strong>Create with AI</strong> to describe an image; it follows the visual style and brand colors in your Brand Brief.</Step>
+          <Step title="Attach to a post">In Content Studio (Edit) or on the calendar, open a post and press <strong>Add images</strong>. Pick up to 10, in the order they should appear.</Step>
+          <Step title="Review again">Changing the images of an approved post sends it back to Needs review, so you see the final version before it goes out.</Step>
+        </Steps>
+        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Facebook and LinkedIn publishing sends text only for now.</Callout>
       </>
     ),
   },

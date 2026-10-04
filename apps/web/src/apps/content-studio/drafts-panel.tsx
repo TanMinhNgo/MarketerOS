@@ -17,6 +17,7 @@ import { allChecked, ApproveChecklist } from "./approve-checklist";
 import { channelLabel, variantToText } from "./channels";
 import { copyText } from "./variant-card";
 import { PublishStatus } from "../integrations/publish-status";
+import { PostMedia } from "../media-library/post-media";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 const STATUS_STYLE = { DRAFT: "bg-amber-500/15 text-amber-700 dark:text-amber-300", READY: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300", SCHEDULED: "bg-primary/15 text-primary", DONE: "bg-muted text-muted-foreground" } as const;
@@ -78,6 +79,7 @@ function EditDialog({ projectId, item, onClose }: { projectId: string; item: Con
           <Textarea aria-label="Text" value={body} rows={8} maxLength={10000} onChange={(e) => { setBody(e.target.value); setError(null); }} />
           <TagInput value={hashtags} onChange={setHashtags} placeholder="Add hashtag…" max={20} />
           <Input aria-label="Call to action" value={cta} placeholder="Call to action (optional)" maxLength={300} onChange={(e) => setCta(e.target.value)} />
+          <PostMedia projectId={projectId} item={item} />
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

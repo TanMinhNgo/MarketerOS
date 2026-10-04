@@ -16,8 +16,9 @@ const n = (v: number) => v.toLocaleString("en-US");
 
 /** Hạn mức của một gói thành câu, lấy từ PLAN_LIMITS (cùng nguồn backend dùng để chặn). */
 function limitsText(key: PlanKey): string {
-  const l: { projects: number; text: number; assistant?: number; automations?: number; automationRuns?: number } = L[key];
+  const l: { projects: number; text: number; images?: number; assistant?: number; automations?: number; automationRuns?: number } = L[key];
   const parts = [`${n(l.projects)} active projects`, `${n(l.text)} AI generations`];
+  if (l.images) parts.push(`${n(l.images)} AI images`);
   if (l.assistant) parts.push(`${n(l.assistant)} AI Assistant messages`);
   if (l.automations) parts.push(`${n(l.automations)} automations turned on`);
   if (l.automationRuns) parts.push(`${n(l.automationRuns)} automation runs`);
@@ -28,7 +29,7 @@ function limitsText(key: PlanKey): string {
 const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Status }> = {
   brand_brief: { label: "Brand Brief", blurb: "Describe your product, audience and tone once; every project keeps its own brief.", status: "now" },
   content_generation: { label: "AI content generation", blurb: "Draft posts in your brand voice, with several variants to choose from.", status: "now" },
-  image_generation: { label: "AI image generation", blurb: "Create visuals that follow the style you describe in your brief.", status: "soon" },
+  image_generation: { label: "AI image generation", blurb: `Create images in your brief's visual style and keep them with your uploads in the Media Library (Free ${L.free.images}, Pro ${L.pro.images}, Max ${L.max.images} a month).`, status: "now" },
   personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and reference material.", status: "soon" },
   content_calendar: { label: "Content calendar", blurb: "Approve drafts, then plan and schedule them on a calendar.", status: "now" },
   more_projects: { label: "More projects", blurb: `Run up to ${L.max.projects} brands or clients side by side (Pro: ${L.pro.projects}, Free: ${L.free.projects}).`, status: "now" },
@@ -57,7 +58,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   { q: "Can I cancel?", a: "Yes, any time from Plans & Billing. You keep your paid plan until the end of the period you already paid for, and you are not charged again." },
   { q: "Do you store my card details?", a: "No. Card details are handled by Stripe through Clerk's billing, so MarketOS never sees them." },
   { q: "Where can I see my payments?", a: "In Plans & Billing, under Billing history, with the date, amount and status of every charge." },
-  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation, the Content Calendar, Reports, the AI Assistant and Integrations with Facebook and LinkedIn (Pro and Max), and Automations (Max) are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
+  { q: "Which features can I use today?", a: "Projects, Trash, Brand Brief, AI content generation, the Content Calendar, Reports, the Media Library with AI images, the AI Assistant and Integrations with Facebook and LinkedIn (Pro and Max), and Automations (Max) are available now. The features marked Coming soon are being built, and the table above shows which plan each one belongs to." },
   { q: "What are the usage limits?", a: `Free: ${limitsText("free")}. Pro: ${limitsText("pro")}. Max: ${limitsText("max")}. One generation writes 3 variants, and every 3 single-variant regenerates count as 1. Generations reset on the 1st of each month (UTC); projects in Trash don't count. You can see your usage in Plans & Billing.` },
   { q: "Is there a team or student plan?", a: "Not yet. There are three plans for now: Free, Pro and Max." },
   { q: "Do automations post or approve anything on their own?", a: "No. Automations on Max write drafts that wait in Needs review, schedule only posts you already approved, and send reports to the AI Assistant chat. They never approve, delete or mark posts as Done." },
@@ -240,7 +241,7 @@ export default function App() {
           ))}
         </ul>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Every generation writes 3 variants on every plan. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. Limits for images and storage will be published here before those features launch.
+          Every generation writes 3 variants on every plan. Regenerating a single variant is cheaper: every 3 count as 1 generation. Generations reset on the 1st of each month (UTC), and projects in Trash don&apos;t count. AI images are counted on their own and uploads don&apos;t count. Storage limits will be published here before they apply.
         </p>
       </Section>
 

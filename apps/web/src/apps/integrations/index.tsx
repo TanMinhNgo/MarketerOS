@@ -21,7 +21,7 @@ const PROVIDERS: { provider: Provider; channel: Connection["channel"]; name: str
 ];
 /** Kênh chưa kết nối được: thẻ có nhãn "In development", nút bị khoá. */
 const IN_DEVELOPMENT: Record<string, string> = {
-  INSTAGRAM: "Every post needs an image, so it comes with the Media Library.",
+  INSTAGRAM: "Every post needs an image; publishing images is next.",
   TIKTOK: "Posts need a video.",
   YOUTUBE: "Posts need a video.",
   EMAIL: "Sending newsletters through an email service.",

@@ -18,6 +18,8 @@ export class ApiError extends Error {
 interface Init {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** Multipart (upload file); trình duyệt tự đặt Content-Type kèm boundary. */
+  form?: FormData;
   signal?: AbortSignal;
 }
 
@@ -25,7 +27,7 @@ interface Init {
  * Gửi request tới /api/* (Next rewrite sang NestJS) kèm Bearer token Clerk; Clerk tự làm mới token.
  * Trả về Response khi 2xx, ngược lại ném ApiError theo { code, message, details } của backend.
  */
-export async function request(path: string, { method = "GET", body, signal, headers }: Init & { headers?: Record<string, string> } = {}): Promise<Response> {
+export async function request(path: string, { method = "GET", body, form, signal, headers }: Init & { headers?: Record<string, string> } = {}): Promise<Response> {
   const token = await getToken();
   let res: Response;
   try {
@@ -33,7 +35,7 @@ export async function request(path: string, { method = "GET", body, signal, head
       method,
       signal,
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
     });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;

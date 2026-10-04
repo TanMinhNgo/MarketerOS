@@ -198,6 +198,7 @@ function Overview({ projectId, s }: Readonly<{ projectId: string; s: ContentSumm
         <Card icon={ChartNoAxesColumn} title="AI usage this month" action={<Button size="xs" variant="ghost" onClick={() => open("plans-billing")}>Plans &amp; Billing</Button>}>
           <div className="space-y-4">
             <Meter label="AI generations" used={usage.text.used} limit={usage.text.limit} hint="Across all projects." />
+            {usage.images && <Meter label="AI images" used={usage.images.used} limit={usage.images.limit} hint="Across all projects." />}
             {usage.assistant && <Meter label="AI Assistant messages" used={usage.assistant.used} limit={usage.assistant.limit} hint="Across all projects." />}
             {usage.automationRuns && <Meter label="Automation runs" used={usage.automationRuns.used} limit={usage.automationRuns.limit} hint="Across all projects." />}
           </div>
