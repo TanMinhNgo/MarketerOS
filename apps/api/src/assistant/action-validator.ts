@@ -22,8 +22,10 @@ export function filterAssistantActions(
     businessAddress: string | null;
   },
   rejected: RejectedAssistantAction[] = [],
+  assets: { id: string }[] = [],
 ): AssistantAction[] {
   const states = new Map(contents.map((item) => [item.id, item.status]));
+  const assetIds = new Set(assets.map((asset) => asset.id));
   return raw.slice(0, 5).flatMap((proposal, index) => {
     const reject = (channel: string, reasons: string[], repairable = false) => {
       rejected.push({ index, channel, reasons, repairable });
@@ -48,6 +50,27 @@ export function filterAssistantActions(
       (!states.has(action.contentId) || states.get(action.contentId) === 'DONE')
     )
       return reject('edit_content', ['FOREIGN_OR_DONE_TARGET']);
+    if (
+      action.type === 'generate_image' &&
+      action.attachToContentId &&
+      (!states.has(action.attachToContentId) ||
+        states.get(action.attachToContentId) === 'DONE')
+    )
+      return reject('generate_image', ['FOREIGN_OR_DONE_TARGET']);
+    if (action.type === 'attach_media') {
+      if (
+        !states.has(action.contentId) ||
+        states.get(action.contentId) === 'DONE'
+      )
+        return reject('attach_media', ['FOREIGN_OR_DONE_TARGET']);
+      if (action.assetIds.some((id) => !assetIds.has(id)))
+        return reject('attach_media', ['FOREIGN_ASSET']);
+    }
+    if (
+      (action.type === 'create_draft' || action.type === 'edit_content') &&
+      action.assetIds?.some((id) => !assetIds.has(id))
+    )
+      return reject(action.type, ['FOREIGN_ASSET']);
     if (action.type === 'create_draft') {
       const errors = validateVariants(
         [

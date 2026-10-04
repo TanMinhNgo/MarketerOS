@@ -81,7 +81,18 @@ export class AssistantService {
       content,
       this.config.getOrThrow<string>('AI_MODEL'),
     );
-    return { context, projectId, userId, ...this.prompts.build(context) };
+    const media = await this.repository.mediaContext(
+      projectId,
+      userId,
+      context.contents.map((item) => item.id),
+    );
+    const enriched = { ...context, media };
+    return {
+      context: enriched,
+      projectId,
+      userId,
+      ...this.prompts.build(enriched),
+    };
   }
   async *stream(prepared: PreparedAssistant, signal: AbortSignal) {
     let finished = false;
@@ -150,15 +161,21 @@ export class AssistantService {
 
   // Automation owns its reservation/persistence; reuse the same prompt, validator and one repair.
   async automationReply(
-    context: PreparedAssistant['context'],
+    context: Omit<PreparedAssistant['context'], 'media'>,
     projectId: string,
     userId: string,
     signal: AbortSignal,
     instructions?: { system: string; prompt: string },
   ) {
-    const prompts = this.prompts.build(context);
+    const media = await this.repository.mediaContext(
+      projectId,
+      userId,
+      context.contents.map((item) => item.id),
+    );
+    const enriched = { ...context, media };
+    const prompts = this.prompts.build(enriched);
     const prepared = {
-      context,
+      context: enriched,
       projectId,
       userId,
       system: prompts.system + (instructions ? '\n' + instructions.system : ''),
@@ -285,14 +302,23 @@ export class AssistantService {
     output: ReturnType<typeof parseAssistantOutput>,
   ) {
     const brief = prepared.context.project.brandBrief!;
-    const ids = output.actions.flatMap((action) =>
-      'contentId' in action ? [action.contentId] : [],
+    const ids = output.actions.flatMap((action) => {
+      if ('contentId' in action) return [action.contentId];
+      if (action.type === 'generate_image' && action.attachToContentId)
+        return [action.attachToContentId];
+      return [];
+    });
+    const assetIds = output.actions.flatMap((action) =>
+      action.type === 'attach_media' ||
+      action.type === 'create_draft' ||
+      action.type === 'edit_content'
+        ? (action.assetIds ?? [])
+        : [],
     );
-    const contents = await this.repository.contents(
-      prepared.projectId,
-      prepared.userId,
-      ids,
-    );
+    const [contents, assets] = await Promise.all([
+      this.repository.contents(prepared.projectId, prepared.userId, ids),
+      this.repository.assets(prepared.projectId, prepared.userId, assetIds),
+    ]);
     const rejected: RejectedAssistantAction[] = [];
     const actions = filterAssistantActions(
       output.actions,
@@ -302,6 +328,7 @@ export class AssistantService {
         language: ContentLanguageSchema.parse(brief.language),
       },
       rejected,
+      assets,
     );
     return { actions, rejected };
   }

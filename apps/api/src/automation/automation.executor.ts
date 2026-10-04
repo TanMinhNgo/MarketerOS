@@ -353,17 +353,26 @@ export class AutomationExecutor {
       if (action.type !== 'create_draft') continue;
       const content = await this.createDraft(tx, projectId, action); // NOSONAR: preserve action order.
       ids.push(content.id);
+      delete action.imagePrompt; // The applied automation action must describe only persisted effects.
       action.status = 'applied';
     }
     return ids;
   }
 
-  private createDraft(
+  private async createDraft(
     tx: Prisma.TransactionClient,
     projectId: string,
     action: Extract<AssistantAction, { type: 'create_draft' }>,
   ) {
-    return tx.contentItem.create({
+    const assetIds = action.assetIds ?? [];
+    if (assetIds.length) {
+      const count = await tx.asset.count({
+        where: { projectId, id: { in: assetIds } },
+      });
+      if (count !== assetIds.length)
+        throw new Error('Invalid automation media asset');
+    }
+    const content = await tx.contentItem.create({
       data: {
         projectId,
         channel: action.channel,
@@ -375,6 +384,16 @@ export class AutomationExecutor {
         scheduledAt: null,
       },
     });
+    if (assetIds.length)
+      await tx.contentAsset.createMany({
+        data: assetIds.map((assetId, position) => ({
+          contentId: content.id,
+          assetId,
+          position,
+        })),
+      });
+    // imagePrompt is intentionally ignored: automation never spends IMAGE quota.
+    return content;
   }
 
   private writeInstructions(
