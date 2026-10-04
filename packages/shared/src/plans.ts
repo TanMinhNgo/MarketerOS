@@ -21,11 +21,12 @@ export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 
 // The same limits drive API enforcement, usage responses, and plan copy.
 export const PLAN_LIMITS = {
-  free: { projects: 3, text: 10 },
-  pro: { projects: 20, text: 200, assistant: 300 },
+  free: { projects: 3, text: 10, images: 5 },
+  pro: { projects: 20, text: 200, images: 50, assistant: 300 },
   max: {
     projects: 50,
     text: 500,
+    images: 200,
     assistant: 1000,
     automations: 10,
     automationRuns: 60,
@@ -35,6 +36,7 @@ export const PLAN_LIMITS = {
   {
     projects: number;
     text: number;
+    images: number;
     assistant?: number;
     automations?: number;
     automationRuns?: number;
@@ -45,6 +47,7 @@ export const PlanLimitsSchema = z
   .object({
     projects: z.number().int().positive(),
     text: z.number().int().positive(),
+    images: z.number().int().positive(),
     assistant: z.number().int().positive().optional(),
     automations: z.number().int().positive().optional(),
     automationRuns: z.number().int().positive().optional(),
@@ -105,7 +108,7 @@ export const PLAN_CATALOG: Record<PlanKey, PlanDefinition> = {
   },
   max: {
     name: 'Max',
-    description: `Everything in Pro, plus up to ${PLAN_LIMITS.max.projects} active projects and ${PLAN_LIMITS.max.automations} active automations. Each UTC month includes ${PLAN_LIMITS.max.text} AI content generations, ${PLAN_LIMITS.max.assistant} Assistant messages and ${PLAN_LIMITS.max.automationRuns} automation runs. Drafts still require your review.`,
+    description: `Everything in Pro, plus up to ${PLAN_LIMITS.max.projects} active projects and ${PLAN_LIMITS.max.automations} active automations. Each UTC month includes ${PLAN_LIMITS.max.text} AI content generations, ${PLAN_LIMITS.max.images} images, ${PLAN_LIMITS.max.assistant} Assistant messages and ${PLAN_LIMITS.max.automationRuns} automation runs. Drafts still require your review.`,
     price: { amountCents: 2500, currency: 'USD', interval: 'month' },
     limits: PLAN_LIMITS.max,
     features: [
