@@ -16,14 +16,14 @@ const SHIPPED = [
   "Reports: where each project's posts stand and what's scheduled for the next 4 weeks",
   "Settings for the beach scene, animations, notifications and window layout",
   "Media Library: upload images or create them with AI in your brand's style, and attach them to posts",
-  "Integrations (Pro): connect a Facebook Page and LinkedIn, auto-publish approved posts, Facebook stats in Reports",
+  "Integrations (Pro): connect a Facebook Page, Instagram and LinkedIn, auto-publish approved posts with their images, Facebook stats in Reports",
   "AI Assistant (Pro): chat per project, with suggested drafts, edits and schedules you apply in one click",
   "Deep links and browser Back / Forward for every app",
   "Mobile layout with full-screen sheets",
 ];
 
 const NEXT = [
-  { name: "Publishing with images", note: "Send a post's images to Facebook and LinkedIn, then Instagram, TikTok and YouTube." },
+  { name: "More channels", note: "Publish videos to TikTok and YouTube." },
 ];
 
 const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "TanStack Query", "NestJS", "Prisma", "PostgreSQL", "BullMQ", "Redis", "Clerk", "OpenAI", "Vercel", "Render", "Neon"];

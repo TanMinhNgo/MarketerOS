@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { allChecked, ApproveChecklist } from "./approve-checklist";
 import { channelLabel, variantToText } from "./channels";
 import { copyText } from "./variant-card";
+import { isPublishing, usePublications } from "@/lib/integrations-api";
 import { PublishStatus } from "../integrations/publish-status";
 import { PostMedia } from "../media-library/post-media";
 
@@ -95,6 +96,7 @@ function EditDialog({ projectId, item, onClose }: { projectId: string; item: Con
 export function DraftsPanel({ projectId }: { projectId: string }) {
   const { data, isPending, error, refetch } = useContents(projectId);
   const remove = useDeleteContent(projectId);
+  const pubs = usePublications(projectId).data;
   const [editing, setEditing] = useState<ContentResponse | null>(null);
   const [approving, setApproving] = useState<ContentResponse | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export function DraftsPanel({ projectId }: { projectId: string }) {
                   <CircleCheck /> Approve
                 </Button>
               )}
-              <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.title}`} title={c.status === "DONE" ? "Published content can't be edited" : undefined} disabled={c.status === "DONE"} onClick={() => setEditing(c)}>
+              <Button variant="ghost" size="icon-sm" aria-label={`Edit ${c.title}`} title={c.status === "DONE" || isPublishing(pubs, c.id) ? "Published content can't be edited" : undefined} disabled={c.status === "DONE" || isPublishing(pubs, c.id)} onClick={() => setEditing(c)}>
                 <Pencil />
               </Button>
               {confirmId === c.id ? (

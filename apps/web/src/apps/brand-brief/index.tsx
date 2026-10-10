@@ -8,6 +8,7 @@ import { errorMessage } from "@/lib/api-client";
 import { useBrief, useProjects } from "@/lib/queries";
 import { useActiveProject } from "@/stores/active-project";
 import { BriefForm } from "./brief-form";
+import { References } from "./references";
 
 function Message({ children }: { children: React.ReactNode }) {
   return <div className="grid h-full place-items-center p-6 text-center text-sm">{children}</div>;
@@ -32,6 +33,7 @@ function BriefLoader({ projectId, name }: { projectId: string; name: string }) {
       </div>
       {/* khởi tạo form một lần từ dữ liệu đã tải; đổi dự án thì key đổi và form dựng lại */}
       <BriefForm projectId={projectId} brief={data} />
+      <References projectId={projectId} />
     </>
   );
 }

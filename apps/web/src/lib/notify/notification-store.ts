@@ -30,7 +30,7 @@ interface NotificationState {
   prefs: NotifyPrefs;
   userId: string | null;
   setUser: (userId: string | null) => void;
-  add: (n: Pick<AppNotification, "kind" | "title" | "description" | "appId">) => AppNotification;
+  add: (n: Pick<AppNotification, "kind" | "title" | "description" | "appId"> & { id?: string }) => AppNotification;
   markRead: (id: string) => void;
   markAllRead: () => void;
   remove: (id: string) => void;
@@ -79,7 +79,7 @@ export const useNotifications = create<NotificationState>()(
       userId: null,
       setUser: (userId) => set({ userId }),
       add: (n) => {
-        const item: AppNotification = { ...n, id: crypto.randomUUID(), createdAt: Date.now(), read: false, userId: get().userId };
+        const item: AppNotification = { ...n, id: n.id ?? crypto.randomUUID(), createdAt: Date.now(), read: false, userId: get().userId };
         // giữ 50 mục mới nhất của mỗi tài khoản
         set((s) => {
           const own = [item, ...s.items.filter(mine(s))].slice(0, MAX_NOTIFICATIONS);

@@ -7,6 +7,8 @@ import {
   OAuthStartResponseSchema,
   PublicationSchema,
   PublicationsResponseSchema,
+  IntegrationProvidersResponseSchema,
+  type IntegrationProvider,
   type ContentResponse,
 } from "@marketos/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,10 +18,11 @@ import { keys, useUsage } from "./queries";
 
 export type Connection = z.infer<typeof ConnectionSchema>;
 export type Publication = z.infer<typeof PublicationSchema>;
-export type Provider = "facebook" | "linkedin";
+export type Provider = IntegrationProvider;
+export type ConnectionProvider = z.infer<typeof IntegrationProvidersResponseSchema>["items"][number];
 
-/** Kênh đăng được trong Phase 10 (bài chữ). Các kênh khác cần ảnh/video (Phase 11). */
-export const PUBLISHABLE = { FACEBOOK: "facebook", LINKEDIN: "linkedin" } as const satisfies Record<Connection["channel"], Provider>;
+/** Kênh có adapter xuất bản; Instagram yêu cầu ít nhất một ảnh. */
+export const PUBLISHABLE = { FACEBOOK: "facebook", INSTAGRAM: "instagram", LINKEDIN: "linkedin" } as const satisfies Partial<Record<Connection["channel"], Provider>>;
 export const isPublishable = (channel: string): channel is Connection["channel"] => channel in PUBLISHABLE;
 
 export const ERROR_TEXT: Record<NonNullable<Publication["errorCode"]>, string> = {
@@ -41,6 +44,13 @@ export function useConnections(projectId: string) {
   const enabled = useCanPublish();
   return useQuery({ queryKey: connectionsKey(projectId), queryFn: () => api(`${base(projectId)}/connections`, ConnectionsResponseSchema), enabled });
 }
+
+export function useConnectionProviders(projectId: string) {
+  const enabled = useCanPublish();
+  return useQuery({ queryKey: ["connection-providers", projectId], queryFn: () => api(`${base(projectId)}/connections/providers`, IntegrationProvidersResponseSchema), enabled });
+}
+export const visibleConnectionProviders = (providers: ConnectionProvider[], connections: Connection[]) =>
+  providers.filter(p => p.configured || connections.some(c => c.channel === p.channel));
 
 /** Kết nối đang dùng được cho một kênh của dự án. */
 export function useChannelConnection(projectId: string, channel: string) {
@@ -83,6 +93,9 @@ export function usePublications(projectId: string) {
 /** Lần đăng gần nhất của một bài (danh sách đã sắp mới nhất trước). */
 export const latestFor = (pubs: Publication[] | undefined, contentId: string) => pubs?.find((p) => p.contentId === contentId);
 
+/** Bài đang được đăng lên kênh: khoá sửa chữ/ảnh (backend trả 409 nếu vẫn gửi). */
+export const isPublishing = (pubs: Publication[] | undefined, contentId: string) => latestFor(pubs, contentId)?.status === "PUBLISHING";
+
 export function usePublishNow(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -97,9 +110,15 @@ export function usePublishNow(projectId: string) {
 
 /** Bắt đầu OAuth: backend trả URL của nền tảng, trình duyệt chuyển sang đó rồi quay về /apps/integrations. */
 export function useStartConnect(projectId: string) {
+  const qc = useQueryClient();
   return useMutation({
     meta: { silent: true },
     mutationFn: async (provider: Provider) => {
+      if (provider === "smtp") {
+        await api(`${base(projectId)}/connections/smtp`, ConnectionSchema, { method: "POST" });
+        await qc.invalidateQueries({ queryKey: connectionsKey(projectId) });
+        return;
+      }
       const { authUrl } = await api(`${base(projectId)}/connections/${provider}/start`, OAuthStartResponseSchema, { method: "POST" });
       globalThis.location.assign(authUrl);
     },
@@ -115,18 +134,18 @@ export function useDisconnect(projectId: string) {
   });
 }
 
-export const useFacebookPages = (projectId: string, session: string | null) =>
+export const useProviderAccounts = (projectId: string, session: string | null, provider: "facebook" | "instagram") =>
   useQuery({
-    queryKey: ["facebook-pages", projectId, session],
+    queryKey: ["provider-accounts", projectId, provider, session],
     enabled: !!session,
-    queryFn: () => api(`${base(projectId)}/connections/facebook/pages?session=${encodeURIComponent(session ?? "")}`, FacebookPagesResponseSchema),
+    queryFn: () => api(`${base(projectId)}/connections/${provider === "facebook" ? "facebook/pages" : "instagram/accounts"}?session=${encodeURIComponent(session ?? "")}`, FacebookPagesResponseSchema),
   });
 
-export function useSelectFacebookPage(projectId: string) {
+export function useSelectProviderAccount(projectId: string, provider: "facebook" | "instagram") {
   const qc = useQueryClient();
   return useMutation({
     meta: { silent: true },
-    mutationFn: (input: { session: string; pageId: string }) => api(`${base(projectId)}/connections/facebook/pages`, ConnectionSchema, { method: "POST", body: input }),
+    mutationFn: (input: { session: string; pageId: string }) => api(`${base(projectId)}/connections/${provider === "facebook" ? "facebook/pages" : "instagram/accounts"}`, ConnectionSchema, { method: "POST", body: input }),
     onSuccess: () => qc.invalidateQueries({ queryKey: connectionsKey(projectId) }),
   });
 }

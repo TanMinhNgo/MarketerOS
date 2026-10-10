@@ -4,10 +4,12 @@ import type { ContentResponse } from "@marketos/shared";
 import { ExternalLink, Send } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useContentAssets } from "@/lib/media-api";
 import { ERROR_TEXT, isPublishable, latestFor, useCanPublish, useChannelConnection, usePublications, usePublishNow, type Publication } from "@/lib/integrations-api";
 import { notify } from "@/lib/notify/notify";
 import { cn } from "@/lib/utils";
 import { channelLabel } from "../content-studio/channels";
+import { AssetThumb } from "../media-library/asset-thumb";
 
 const when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -31,9 +33,33 @@ function statusNote(last: Publication | undefined, target: string | null, item: 
   return null;
 }
 
+/** Bản xem trước đúng nội dung sẽ đăng: chữ đầy đủ và ảnh theo thứ tự gắn vào bài. */
+function PublishPreview({ projectId, item }: Readonly<{ projectId: string; item: ContentResponse }>) {
+  const media = useContentAssets(projectId, item.id);
+  const caption = [item.body, item.hashtags.join(" "), item.cta].filter(Boolean).join("\n\n");
+  return (
+    <div className="w-full space-y-2 rounded-lg border bg-muted/40 p-2.5">
+      <p className="font-semibold">This is what will be posted</p>
+      <p className="max-h-40 overflow-y-auto whitespace-pre-wrap">{caption}</p>
+      {media.isPending && <p className="text-muted-foreground">Loading images…</p>}
+      {!!media.data?.items.length && (
+        <ol className="flex flex-wrap gap-2" aria-label="Images, in posting order">
+          {media.data.items.map((a, i) => (
+            <li key={a.id} className="relative">
+              <AssetThumb projectId={projectId} asset={a} className="size-14" />
+              <span className="absolute left-1 top-1 rounded bg-background/90 px-1 text-[10px] font-bold">{i + 1}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {media.data && !media.data.items.length && <p className="text-muted-foreground">No images, text only.</p>}
+    </div>
+  );
+}
+
 /**
  * Trạng thái đăng lên kênh thật của một bài + nút Publish now (có bước xác nhận vì đăng ra ngoài).
- * Không hiện gì khi gói không có Integrations; kênh chưa hỗ trợ thì báo "in development".
+ * Không hiện gì khi gói không có Integrations; chỉ hiển thị kênh có adapter xuất bản.
  */
 export function PublishStatus({ projectId, item, className }: Readonly<{ projectId: string; item: ContentResponse; className?: string }>) {
   const canPublish = useCanPublish();
@@ -42,10 +68,7 @@ export function PublishStatus({ projectId, item, className }: Readonly<{ project
   const publish = usePublishNow(projectId);
   const [confirming, setConfirming] = useState(false);
   if (!canPublish) return null;
-  if (!isPublishable(item.channel))
-    return item.status === "READY" || item.status === "SCHEDULED" ? (
-      <p className={cn("text-xs text-muted-foreground", className)}>Publishing to {channelLabel(item.channel)} is in development. Copy the post and share it yourself for now.</p>
-    ) : null;
+  if (!isPublishable(item.channel)) return null;
 
   const last = latestFor(pubs.data, item.id);
   const target = connection?.displayName ?? channelLabel(item.channel);
@@ -71,6 +94,7 @@ export function PublishStatus({ projectId, item, className }: Readonly<{ project
       {showButton &&
         (confirming ? (
           <>
+            <PublishPreview projectId={projectId} item={item} />
             <Button size="xs" disabled={publish.isPending} onClick={run}>{publish.isPending ? "Publishing…" : `Post to ${target} now`}</Button>
             <Button size="xs" variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
           </>

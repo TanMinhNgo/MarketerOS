@@ -193,6 +193,7 @@ export const SECTIONS: DocSection[] = [
             ["Sample posts", "Paste posts you love so the AI can copy the style (up to 10)."],
             ["Brand colors", "Pick a colour and press Add color (up to 10)."],
             ["Visual style", "Describe the look of your imagery."],
+            ["References", "Below the form: up to 10 texts per project (up to 4,000 characters each) such as your menu, an FAQ or posts in your voice. Mark each as facts to use or a writing style to learn; untick On to leave it out of the next AI run."],
             ["Business address (optional)", "Used in the footer of email content. Leave it empty if you don't send email; the AI then leaves a placeholder for you to fill in."],
           ]}
         />
@@ -256,7 +257,7 @@ export const SECTIONS: DocSection[] = [
           <Step title="Open AI Assistant">Double-click its chat-bubble icon. The project needs a Brand Brief.</Step>
           <Step title="Ask">Type a question or a request, then press Enter (Shift+Enter for a new line). Press Stop to cut a reply short.</Step>
           <Step title="Review suggestions">Under a reply you may see cards: a new draft, an edit to a post, a schedule, or a Brand Brief change, with what changes.</Step>
-          <Step title="Apply or dismiss">Nothing changes until you press <strong>Apply</strong>. Dismiss hides a suggestion.</Step>
+          <Step title="Apply or dismiss">Nothing changes until you press <strong>Apply</strong>. Dismiss hides a suggestion. If Apply stops halfway (for example the image couldn&apos;t be attached), the card shows <strong>Partly done</strong> with links to what was made; press <strong>Continue</strong> to finish without creating anything twice.</Step>
         </Steps>
         <Figure src="/docs/17-ai-assistant.png" alt="AI Assistant chat with a suggested draft card" caption="The assistant replies and suggests a new draft with an image. Nothing changes until you press Apply." />
         <Table
@@ -336,20 +337,19 @@ export const SECTIONS: DocSection[] = [
           <Step title="Attach to a post">In Content Studio (Edit) or on the calendar, open a post and press <strong>Add images</strong>. Pick up to 10, in the order they should appear.</Step>
           <Step title="Review again">Changing the images of an approved post sends it back to Needs review, so you see the final version before it goes out.</Step>
         </Steps>
-        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Facebook and LinkedIn publishing sends text only for now.</Callout>
+        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Posts published to supported channels include their images, in the order you set. Instagram requires at least one image.</Callout>
       </>
     ),
   },
   {
     id: "integrations",
     title: "Integrations",
-    summary: "Connect Facebook and LinkedIn and publish approved posts (Pro).",
+    summary: "Connect configured Facebook, Instagram Professional and LinkedIn accounts (Pro).",
     body: (
       <>
-        <P>Integrations are part of <strong>Pro</strong> and <strong>Max</strong>. Each project connects its own accounts: one Facebook Page and one LinkedIn profile.</P>
-        <Figure src="/docs/20-integrations.png" alt="Integrations with Facebook and LinkedIn ready to connect" caption="Press Connect on a channel. Channels marked In development can't be connected yet." />
+        <P>Integrations are part of <strong>Pro</strong> and <strong>Max</strong>. Each project connects its own accounts: one Facebook Page, one Instagram Professional account and one LinkedIn profile. Only channels configured by the workspace appear.</P>
         <Steps>
-          <Step title="Connect">Open Integrations and press Connect. Sign in on Facebook or LinkedIn and allow posting. If you manage several Facebook Pages, choose one.</Step>
+          <Step title="Connect">Open Integrations and press Connect. Sign in on the platform and allow posting. Instagram needs a Business or Creator account linked to a Facebook Page. If several accounts are available, choose one.</Step>
           <Step title="Approve and schedule">Approve a post and put it on the Content Calendar. Posts that still need review are never published.</Step>
           <Step title="It publishes">At the scheduled time MarketOS posts it, marks it Done and adds a link to the live post. Press <strong>Publish now</strong> to post an approved one straight away.</Step>
         </Steps>
@@ -361,7 +361,7 @@ export const SECTIONS: DocSection[] = [
             ["Disconnect", "Scheduled posts for that channel stop publishing. Posts already published stay where they are."],
           ]}
         />
-        <Callout kind="note">Posts are published as text for now. Instagram, TikTok and YouTube need images or video, so they come after publishing with images.</Callout>
+        <Callout kind="note">A post goes out with its text and up to 10 images, in the order you set. Before <strong>Publish now</strong> you see exactly what will be posted. While a post is being published you can&apos;t edit it. Instagram posts need at least one image. TikTok and YouTube aren&apos;t supported yet.</Callout>
       </>
     ),
   },
@@ -443,6 +443,7 @@ export const SECTIONS: DocSection[] = [
             ["Your 3 variants are ready", "AI finished writing while Content Studio was minimized, behind another window or in another tab."],
             ["Posting reminders", "A summary of today's scheduled posts, and a reminder 15 minutes before each one."],
             ["Account updates", "A project moved to Trash or restored, a Brand Brief saved, a plan cancelled."],
+            ["Problems to check", "A post couldn't publish or is taking long, a channel needs reconnecting, or an automation run failed. Checked about once a minute for the selected project; the item disappears once the problem is gone."],
           ]}
         />
         <Steps>

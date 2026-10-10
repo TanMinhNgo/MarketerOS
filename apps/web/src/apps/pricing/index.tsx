@@ -30,7 +30,7 @@ const FEATURES: Record<FeatureKey, { label: string; blurb: string; status: Statu
   brand_brief: { label: "Brand Brief", blurb: "Describe your product, audience and tone once; every project keeps its own brief.", status: "now" },
   content_generation: { label: "AI content generation", blurb: "Draft posts in your brand voice, with several variants to choose from.", status: "now" },
   image_generation: { label: "AI image generation", blurb: `Create images in your brief's visual style and keep them with your uploads in the Media Library (Free ${L.free.images}, Pro ${L.pro.images}, Max ${L.max.images} a month).`, status: "now" },
-  personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and reference material.", status: "soon" },
+  personalization: { label: "Personalization and references", blurb: "Teach the AI with sample posts and up to 10 text references per project (facts or writing style).", status: "now" },
   content_calendar: { label: "Content calendar", blurb: "Approve drafts, then plan and schedule them on a calendar.", status: "now" },
   more_projects: { label: "More projects", blurb: `Run up to ${L.max.projects} brands or clients side by side (Pro: ${L.pro.projects}, Free: ${L.free.projects}).`, status: "now" },
   strong_model: { label: "Advanced AI models", blurb: "A stronger model for longer, more nuanced writing.", status: "soon" },

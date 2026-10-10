@@ -7,32 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWindowStore } from "@/desktop/window-store";
 import { errorMessage } from "@/lib/api-client";
-import { useConnections, useDisconnect, useFacebookPages, useSelectFacebookPage, useStartConnect, type Connection, type Provider } from "@/lib/integrations-api";
+import { useConnections, useConnectionProviders, visibleConnectionProviders, useDisconnect, useProviderAccounts, useSelectProviderAccount, useStartConnect, type Connection, type ConnectionProvider } from "@/lib/integrations-api";
 import { notify } from "@/lib/notify/notify";
 import { useProjects, useUsage } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 import { useActiveProject } from "@/stores/active-project";
 import { channelColor } from "../content-calendar/channel-colors";
-import { CHANNELS } from "../content-studio/channels";
-
-const PROVIDERS: { provider: Provider; channel: Connection["channel"]; name: string; blurb: string }[] = [
-  { provider: "facebook", channel: "FACEBOOK", name: "Facebook Page", blurb: "Auto-publish approved posts to a Page you manage, and bring post stats into Reports." },
-  { provider: "linkedin", channel: "LINKEDIN", name: "LinkedIn", blurb: "Auto-publish approved posts to your personal profile. LinkedIn doesn't share post stats with apps." },
-];
-/** Kênh chưa kết nối được: thẻ có nhãn "In development", nút bị khoá. */
-const IN_DEVELOPMENT: Record<string, string> = {
-  INSTAGRAM: "Every post needs an image; publishing images is next.",
-  TIKTOK: "Posts need a video.",
-  YOUTUBE: "Posts need a video.",
-  EMAIL: "Sending newsletters through an email service.",
-  BLOG: "Publishing to WordPress and other blogs.",
-};
-
 /** Mã lỗi backend gắn vào URL khi quay về từ OAuth. */
 const RETURN_ERROR: Record<string, string> = {
   INVALID_STATE: "The sign-in link expired or was already used. Please connect again.",
   PLAN_REQUIRED: "Integrations are part of Pro and Max.",
   NO_PAGE: "Your Facebook account doesn't manage any Page. Create a Page or ask for a role on one, then connect again.",
+  NO_INSTAGRAM_ACCOUNT: "No Instagram Business or Creator account is linked to a Page you manage. Link it to a Page, then connect again.",
   PROVIDER_ERROR: "The platform didn't finish the sign-in. Please try again.",
 };
 const STATUS: Record<Connection["status"], { label: string; cls: string }> = {
@@ -47,17 +33,17 @@ function Message({ children }: Readonly<{ children: React.ReactNode }>) {
 }
 
 /** Facebook có nhiều Page: chọn một Page cho dự án (session do backend tạo, sống 10 phút). */
-function PagePicker({ projectId, session, onClose }: Readonly<{ projectId: string; session: string; onClose: () => void }>) {
-  const pages = useFacebookPages(projectId, session);
-  const select = useSelectFacebookPage(projectId);
+function PagePicker({ projectId, session, provider, onClose }: Readonly<{ projectId: string; session: string; provider: "facebook" | "instagram"; onClose: () => void }>) {
+  const pages = useProviderAccounts(projectId, session, provider);
+  const select = useSelectProviderAccount(projectId, provider);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Choose a Facebook Page</DialogTitle>
-          <DialogDescription>MarketOS will post to this Page for the current project.</DialogDescription>
+          <DialogTitle>{provider === "instagram" ? "Choose an Instagram account" : "Choose a Facebook Page"}</DialogTitle>
+          <DialogDescription>MarketOS will post to this account for the current project.</DialogDescription>
         </DialogHeader>
-        {pages.isPending && <p className="text-sm text-muted-foreground">Loading Pages…</p>}
+        {pages.isPending && <p className="text-sm text-muted-foreground">Loading accounts…</p>}
         {pages.error && <p className="text-sm text-destructive">{errorMessage(pages.error)} The choice may have expired; connect again.</p>}
         <ul className="space-y-1.5">
           {pages.data?.items.map((p) => (
@@ -70,7 +56,7 @@ function PagePicker({ projectId, session, onClose }: Readonly<{ projectId: strin
                     { session, pageId: p.id },
                     {
                       onSuccess: (c) => {
-                        notify.success(`Connected ${c.displayName}`, { description: "Approved, scheduled posts for Facebook will publish here." });
+                        notify.success(`Connected ${c.displayName}`, { description: "Approved, scheduled posts for this channel will publish here." });
                         onClose();
                       },
                       onError: (e) => notify.apiError("Couldn't connect the Page", e),
@@ -98,7 +84,7 @@ function PagePicker({ projectId, session, onClose }: Readonly<{ projectId: strin
   );
 }
 
-function ProviderCard({ projectId, p, connection }: Readonly<{ projectId: string; p: (typeof PROVIDERS)[number]; connection?: Connection }>) {
+function ProviderCard({ projectId, p, connection }: Readonly<{ projectId: string; p: ConnectionProvider; connection?: Connection }>) {
   const start = useStartConnect(projectId);
   const disconnect = useDisconnect(projectId);
   const [confirming, setConfirming] = useState(false);
@@ -136,7 +122,7 @@ function ProviderCard({ projectId, p, connection }: Readonly<{ projectId: string
 
       <div className="mt-3 flex flex-wrap gap-2">
         {(!connection || !usable) && (
-          <Button size="sm" disabled={start.isPending} onClick={connect}>
+          <Button size="sm" disabled={start.isPending || !p.configured} onClick={connect}>
             <Plug /> {connection ? "Reconnect" : "Connect"}
           </Button>
         )}
@@ -169,26 +155,9 @@ function ProviderCard({ projectId, p, connection }: Readonly<{ projectId: string
   );
 }
 
-function DevCard({ channel, name, why }: Readonly<{ channel: string; name: string; why?: string }>) {
-  return (
-    <article aria-label={name} className="rounded-2xl border-2 border-dashed border-[#3B2A4A]/30 bg-card/70 p-4">
-      <header className="flex items-start gap-3">
-        <span className="mt-0.5 size-3 shrink-0 rounded-full" style={{ background: channelColor(channel) }} aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <h3 className="font-semibold">{name}</h3>
-          <p className="text-xs text-muted-foreground">{why}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">In development</span>
-      </header>
-      <Button className="mt-3" size="sm" variant="outline" disabled>
-        <Plug /> Connect
-      </Button>
-    </article>
-  );
-}
-
-function ProjectIntegrations({ projectId, name, session, onPicked }: Readonly<{ projectId: string; name: string; session: string | null; onPicked: () => void }>) {
+function ProjectIntegrations({ projectId, name, session, provider, onPicked }: Readonly<{ projectId: string; name: string; session: string | null; provider: "facebook" | "instagram"; onPicked: () => void }>) {
   const list = useConnections(projectId);
+  const catalog = useConnectionProviders(projectId);
   const byChannel = (ch: string) => list.data?.items.find((c) => c.channel === ch);
 
   return (
@@ -199,17 +168,16 @@ function ProjectIntegrations({ projectId, name, session, onPicked }: Readonly<{ 
       </header>
       {list.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
       {list.error && <p className="text-sm text-destructive">{errorMessage(list.error)}</p>}
-      {list.data && (
+      {catalog.error && <p className="text-sm text-destructive">{errorMessage(catalog.error)}</p>}
+      {catalog.isPending && <p className="text-sm text-muted-foreground">Loading available channels…</p>}
+      {list.data && catalog.data && (
         <div className="space-y-3">
-          {CHANNELS.map(({ value, label }) => {
-            const p = PROVIDERS.find((x) => x.channel === value);
-            return p ? <ProviderCard key={value} projectId={projectId} p={p} connection={byChannel(value)} /> : <DevCard key={value} channel={value} name={label} why={IN_DEVELOPMENT[value]} />;
-          })}
+          {visibleConnectionProviders(catalog.data.items, list.data.items).map(p => <ProviderCard key={p.channel} projectId={projectId} p={p} connection={byChannel(p.channel)} />)}
+          {!visibleConnectionProviders(catalog.data.items, list.data.items).length && <p className="text-sm text-muted-foreground">No channel connections are configured yet.</p>}
         </div>
       )}
 
-
-      {session && <PagePicker projectId={projectId} session={session} onClose={onPicked} />}
+      {session && <PagePicker projectId={projectId} session={session} provider={provider} onClose={onPicked} />}
     </div>
   );
 }
@@ -229,7 +197,8 @@ function useOAuthReturn() {
     else if (result !== "pick") notify.error("Couldn't connect the account", { description: RETURN_ERROR[q.get("code") ?? ""] ?? RETURN_ERROR.PROVIDER_ERROR });
     globalThis.history.replaceState(null, "", globalThis.location.pathname);
   }, []);
-  return [session, () => setSession(null)] as const;
+  const [provider] = useState<"facebook" | "instagram">(() => new URLSearchParams(globalThis.location.search).get("provider") === "instagram" ? "instagram" : "facebook");
+  return [session, () => setSession(null), provider] as const;
 }
 
 function IntegrationsApp() {
@@ -238,7 +207,7 @@ function IntegrationsApp() {
   const projects = useProjects();
   const activeId = useActiveProject((s) => s.activeId);
   const project = projects.data?.items.find((p) => p.id === activeId);
-  const [session, clearSession] = useOAuthReturn();
+  const [session, clearSession, provider] = useOAuthReturn();
 
   if (usage.isPending || projects.isPending) return <Message><output className="text-muted-foreground">Loading…</output></Message>;
   if (usage.error) return <Message><p>{errorMessage(usage.error)}</p></Message>;
@@ -248,7 +217,7 @@ function IntegrationsApp() {
         <div className="max-w-sm">
           <Lock className="mx-auto size-8 text-muted-foreground" aria-hidden="true" />
           <p className="mt-2 font-semibold">Integrations are part of Pro and Max</p>
-          <p className="mt-1 text-muted-foreground">Connect a Facebook Page and LinkedIn, publish approved posts on schedule, and see how they perform in Reports.</p>
+          <p className="mt-1 text-muted-foreground">Connect Facebook, Instagram Professional or LinkedIn, publish approved posts on schedule, and see how they perform in Reports.</p>
           <Button className="mt-3" onClick={() => open("plans-billing")}><Sparkles /> See plans</Button>
         </div>
       </Message>
@@ -263,7 +232,7 @@ function IntegrationsApp() {
         </div>
       </Message>
     );
-  return <ProjectIntegrations key={project.id} projectId={project.id} name={project.name} session={session} onPicked={clearSession} />;
+  return <ProjectIntegrations key={project.id} projectId={project.id} name={project.name} session={session} provider={provider} onPicked={clearSession} />;
 }
 
 export default function App() {

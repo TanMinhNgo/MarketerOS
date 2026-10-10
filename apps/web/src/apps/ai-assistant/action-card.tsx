@@ -1,7 +1,7 @@
 "use client";
 
 import type { AssistantAction, BrandBriefResponse, ContentResponse } from "@marketos/shared";
-import { CalendarClock, Check, FilePlus2, ImagePlus, Images, Palette, PenLine, X } from "lucide-react";
+import { CalendarClock, Check, FilePlus2, ImagePlus, Images, Palette, PenLine, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/api-client";
 import { LANGUAGES } from "@/lib/languages";
@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { channelColor } from "../content-calendar/channel-colors";
 import { channelLabel } from "../content-studio/channels";
 import { AssetStrip } from "../media-library/asset-thumb";
-import { AppliedButNotMarked, useActionStatus } from "./use-assistant";
+import { OpenAppButton } from "@/desktop/OpenAppButton";
+import { useAction } from "./use-assistant";
 
 const when = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -153,10 +154,16 @@ export function ActionCard({
   contents: ContentResponse[];
   brief: BrandBriefResponse | null | undefined;
 }>) {
-  const status = useActionStatus(projectId, messageId);
+  const { progress, apply, dismiss } = useAction(projectId, messageId, action);
   const { icon: Icon, title, body, channel } = preview(projectId, action, contents, brief);
-  const appliedAnyway = status.error instanceof AppliedButNotMarked;
-  const settled = action.status !== "proposed" || appliedAnyway;
+  const step = progress.data;
+  const applied = action.status === "applied" || step?.status === "applied";
+  const settled = applied || action.status === "dismissed";
+  // Đang chạy ở tab/lượt khác (lease 5 phút): không cho bấm, chỉ kiểm tra lại.
+  const runningElsewhere = step?.status === "running" && !apply.isPending;
+  const partial = step?.status === "partial";
+  const busy = apply.isPending || dismiss.isPending || runningElsewhere || progress.isLoading;
+  const error = apply.error ?? dismiss.error;
 
   return (
     <article aria-label={title} className={cn("msg-in origin-top-left rounded-xl border bg-background p-3", settled && "opacity-75")}>
@@ -169,23 +176,38 @@ export function ActionCard({
             {channelLabel(channel)}
           </span>
         )}
-        {(action.status === "applied" || appliedAnyway) && <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold">Applied</span>}
+        {applied && <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold">Applied</span>}
         {action.status === "dismissed" && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">Dismissed</span>}
+        {!settled && partial && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold">Partly done</span>}
       </header>
       <div className="space-y-2">{body}</div>
-      {!settled && NOTE[action.type] && <p className="mt-2 text-[11px] text-muted-foreground">{NOTE[action.type]}</p>}
-      {!settled && "imagePrompt" in action && action.imagePrompt && <p className="text-[11px] text-muted-foreground">Creating the new image uses 1 AI image from this month&apos;s limit.</p>}
-      {status.error && (
+      {!settled && !partial && NOTE[action.type] && <p className="mt-2 text-[11px] text-muted-foreground">{NOTE[action.type]}</p>}
+      {!settled && !partial && "imagePrompt" in action && action.imagePrompt && <p className="text-[11px] text-muted-foreground">Creating the new image uses 1 AI image from this month&apos;s limit.</p>}
+      {!settled && partial && <p className="mt-2 text-xs">Some steps finished. Continue to finish the rest, or dismiss it and keep what was made.</p>}
+      {!settled && runningElsewhere && <p className="mt-2 text-xs">This suggestion is still being applied. Check again in a moment.</p>}
+      {error && (
         <p role="alert" className="mt-2 text-xs text-destructive">
-          {appliedAnyway ? status.error.message : errorMessage(status.error)}
+          {errorMessage(error)}
         </p>
+      )}
+      {!settled && (step?.contentId || step?.assetId) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {step.contentId && <OpenAppButton appId="content-studio" size="xs" variant="outline">Open the post</OpenAppButton>}
+          {step.assetId && <OpenAppButton appId="media-library" size="xs" variant="outline">Open the image</OpenAppButton>}
+        </div>
       )}
       {!settled && (
         <div className="mt-3 flex gap-2">
-          <Button size="sm" disabled={status.isPending} onClick={() => status.mutate({ action, status: "applied" })}>
-            <Check /> {status.isPending && status.variables?.status === "applied" ? "Applying…" : "Apply"}
-          </Button>
-          <Button size="sm" variant="ghost" disabled={status.isPending} onClick={() => status.mutate({ action, status: "dismissed" })}>
+          {runningElsewhere ? (
+            <Button size="sm" variant="outline" disabled={progress.isFetching} onClick={() => void progress.refetch()}>
+              <RefreshCw /> Check again
+            </Button>
+          ) : (
+            <Button size="sm" disabled={busy} onClick={() => apply.mutate()}>
+              <Check /> {apply.isPending ? "Applying…" : partial ? "Continue" : "Apply"}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => dismiss.mutate()}>
             <X /> Dismiss
           </Button>
         </div>
