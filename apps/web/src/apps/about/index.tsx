@@ -26,7 +26,7 @@ const NEXT = [
   { name: "Publishing with images", note: "Send a post's images to Facebook and LinkedIn, then Instagram, TikTok and YouTube." },
 ];
 
-const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "TanStack Query", "NestJS", "PostgreSQL", "Clerk", "OpenAI"];
+const STACK = ["Next.js", "React", "TypeScript", "Tailwind CSS", "Zustand", "TanStack Query", "NestJS", "Prisma", "PostgreSQL", "BullMQ", "Redis", "Clerk", "OpenAI", "Vercel", "Render", "Neon"];
 
 export default function App() {
   return (
