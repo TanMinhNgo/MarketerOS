@@ -1,6 +1,62 @@
 import { z } from 'zod';
 
-export const IntegrationChannelSchema = z.enum(['FACEBOOK', 'LINKEDIN']);
+export const IntegrationChannelSchema = z.enum([
+  'FACEBOOK',
+  'INSTAGRAM',
+  'LINKEDIN',
+  'EMAIL',
+]);
+export const IntegrationProviderSchema = z.enum([
+  'facebook',
+  'instagram',
+  'linkedin',
+  'smtp',
+]);
+export type IntegrationProvider = z.infer<typeof IntegrationProviderSchema>;
+export const INTEGRATION_PROVIDERS = [
+  {
+    provider: 'facebook',
+    channel: 'FACEBOOK',
+    name: 'Facebook Page',
+    blurb:
+      'Publish approved posts to a Page you manage and bring post stats into Reports.',
+  },
+  {
+    provider: 'instagram',
+    channel: 'INSTAGRAM',
+    name: 'Instagram Professional',
+    blurb:
+      'Publish approved image posts to a Business or Creator account linked to a Facebook Page.',
+  },
+  {
+    provider: 'linkedin',
+    channel: 'LINKEDIN',
+    name: 'LinkedIn',
+    blurb:
+      'Publish approved posts to your personal profile. Post stats are not available.',
+  },
+  {
+    provider: 'smtp',
+    channel: 'EMAIL',
+    name: 'Email (SMTP)',
+    blurb: 'Send approved plain-text email through the configured SMTP sender.',
+  },
+] as const;
+export const IntegrationProvidersResponseSchema = z
+  .object({
+    items: z.array(
+      z
+        .object({
+          provider: IntegrationProviderSchema,
+          channel: IntegrationChannelSchema,
+          name: z.string(),
+          blurb: z.string(),
+          configured: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 export const ConnectionSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -17,6 +73,12 @@ export const ConnectionsResponseSchema = z.object({
   items: z.array(ConnectionSchema),
 });
 export const OAuthStartResponseSchema = z.object({ authUrl: z.url() });
+export const PublishEmailSchema = z.object({ to: z.email().max(254) }).strict();
+export const PublishInputSchema = z
+  .object({ email: PublishEmailSchema.optional() })
+  .strict()
+  .default({});
+export type PublishInput = z.infer<typeof PublishInputSchema>;
 export const FacebookPageSchema = z.object({
   id: z.string(),
   name: z.string(),

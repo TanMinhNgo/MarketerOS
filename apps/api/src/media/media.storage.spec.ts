@@ -1,6 +1,76 @@
 import { ConfigService } from '@nestjs/config';
 import ImageKit from '@imagekit/nodejs';
 import { MediaStorage } from './media.storage';
+import sharp from 'sharp';
+
+test('publication reads reject non-byte stream data', async () => {
+  jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue('invalid' as unknown as Uint8Array);
+          controller.close();
+        },
+      }),
+    ),
+  );
+  const storage = new MediaStorage(new ConfigService());
+  jest.spyOn(storage, 'url').mockResolvedValue({
+    url: 'https://ik.example/signed',
+    expiresAt: new Date().toISOString(),
+  });
+  try {
+    await expect(storage.publicationImage('file')).rejects.toThrow(
+      'Invalid publication image stream',
+    );
+  } finally {
+    jest.restoreAllMocks();
+  }
+});
+
+test('publication images use a signed read, reject redirects and convert WebP to PNG', async () => {
+  const bytes = await sharp({
+    create: { width: 8, height: 8, channels: 3, background: 'red' },
+  })
+    .webp()
+    .toBuffer();
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(new Uint8Array(bytes)));
+  const storage = new MediaStorage(new ConfigService());
+  jest.spyOn(storage, 'url').mockResolvedValue({
+    url: 'https://ik.example/signed',
+    expiresAt: new Date().toISOString(),
+  });
+  try {
+    expect(
+      (await sharp(await storage.publicationImage('file')).metadata()).format,
+    ).toBe('png');
+    expect(fetcher).toHaveBeenCalledWith(
+      'https://ik.example/signed',
+      expect.objectContaining({ redirect: 'error' }),
+    );
+  } finally {
+    jest.restoreAllMocks();
+  }
+});
+
+test('publication reads enforce the limit even without content-length', async () => {
+  const fetcher = jest
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(new Uint8Array(10 * 1024 * 1024 + 1)));
+  const storage = new MediaStorage(new ConfigService());
+  jest.spyOn(storage, 'url').mockResolvedValue({
+    url: 'https://ik.example/signed',
+    expiresAt: new Date().toISOString(),
+  });
+  try {
+    await expect(storage.publicationImage('file')).rejects.toThrow('too large');
+  } finally {
+    fetcher.mockRestore();
+    jest.restoreAllMocks();
+  }
+});
 
 test('ImageKit storage uploads private files, signs reads and deletes by file ID', async () => {
   const client = {
@@ -41,6 +111,22 @@ test('ImageKit storage uploads private files, signs reads and deletes by file ID
     expiresIn: 300,
   });
   expect(signed.url).toBe('https://ik.example/signed');
+  await storage.instagramImageUrl(fileId);
+  expect(client.helper.buildSrc).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      signed: true,
+      expiresIn: 900,
+      transformation: [
+        {
+          format: 'jpg',
+          width: 1080,
+          height: 1080,
+          cropMode: 'pad_resize',
+          quality: 85,
+        },
+      ],
+    }),
+  );
   await storage.remove(fileId);
   expect(client.files.delete).toHaveBeenCalledWith('file-123');
 });

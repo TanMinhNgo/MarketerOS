@@ -7,6 +7,28 @@ const valid = {
   AI_MODEL: 'test-model',
 };
 
+test('SMTP is optional and rejects malformed sender, port and TLS settings without leaking values', () => {
+  expect(validateEnvironment(valid).SMTP_PORT).toBe(587);
+  expect(
+    validateEnvironment({
+      ...valid,
+      SMTP_FROM: '',
+      SMTP_PORT: '465',
+      SMTP_SECURE: 'true',
+    }).SMTP_SECURE,
+  ).toBe('true');
+  for (const field of [
+    { SMTP_FROM: 'secret-invalid' },
+    { SMTP_PORT: '0' },
+    { SMTP_SECURE: 'yes' },
+    { SMTP_FROM_NAME: 'Name\r\nBcc: victim@example.com' },
+  ]) {
+    expect(() => validateEnvironment({ ...valid, ...field })).toThrow(
+      /Invalid environment variables: SMTP_/,
+    );
+  }
+});
+
 test('validates configuration and never echoes secret values', () => {
   expect(validateEnvironment(valid).PORT).toBe(3001);
   expect(validateEnvironment({ ...valid, PORT: '4000' }).PORT).toBe(4000);

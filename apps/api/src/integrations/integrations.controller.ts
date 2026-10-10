@@ -41,8 +41,12 @@ import {
   PublicationsQuerySchema,
   PublicationsResponseSchema,
   SelectFacebookPageSchema,
+  IntegrationProviderSchema,
+  IntegrationProvidersResponseSchema,
   type PublicationsQuery,
   type SelectFacebookPageInput,
+  PublishInputSchema,
+  type PublishInput,
 } from '@marketos/shared';
 import { CurrentUser, Public, type AuthUser } from '../auth/auth.decorators';
 import { SchemaPipe } from '../common/schema.pipe';
@@ -52,12 +56,12 @@ import { IntegrationsService } from './integrations.service';
 import type { Provider } from './provider.gateway';
 
 const provider = (value: string): Provider => {
-  if (value !== 'facebook' && value !== 'linkedin')
+  if (value === 'smtp' || !IntegrationProviderSchema.safeParse(value).success)
     throw new BadRequestException({
       code: 'VALIDATION',
       message: 'Unsupported provider.',
     });
-  return value;
+  return value as Provider;
 };
 
 @ApiTags('integrations')
@@ -80,6 +84,41 @@ export class ConnectionsController {
   list(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
     return this.service.list(projectId, user.id);
   }
+  @Get('providers')
+  @ApiOkResponse({ schema: apiSchema(IntegrationProvidersResponseSchema) })
+  catalog(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+  ) {
+    return this.service.catalog(projectId, user.id);
+  }
+  @Get('instagram/accounts')
+  @ApiQuery({ name: 'session', required: true })
+  @ApiOkResponse({ schema: apiSchema(FacebookPagesResponseSchema) })
+  instagramAccounts(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+    @Query('session') session: string,
+  ) {
+    return this.service.pages(projectId, user.id, session, 'instagram');
+  }
+  @Post('instagram/accounts')
+  @ApiBody({ schema: apiSchema(SelectFacebookPageSchema, 'input') })
+  @ApiCreatedResponse({ schema: apiSchema(ConnectionSchema) })
+  selectInstagram(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+    @Body(new SchemaPipe(SelectFacebookPageSchema))
+    input: SelectFacebookPageInput,
+  ) {
+    return this.service.selectPage(
+      projectId,
+      user.id,
+      input.session,
+      input.pageId,
+      'instagram',
+    );
+  }
   @Post(':provider/start')
   @ApiCreatedResponse({ schema: apiSchema(OAuthStartResponseSchema) })
   start(
@@ -88,6 +127,17 @@ export class ConnectionsController {
     @Param('provider') raw: string,
   ) {
     return this.service.start(projectId, user, provider(raw));
+  }
+  @Post('smtp')
+  @ApiCreatedResponse({ schema: apiSchema(ConnectionSchema) })
+  connectSmtp(
+    @CurrentUser() user: AuthUser,
+    @Param('projectId') projectId: string,
+    @Body(new SchemaPipe(z.object({}).strict().default({})))
+    _input: Record<string, never>,
+  ) {
+    void _input;
+    return this.service.connectSmtp(projectId, user.id);
   }
   @Get('facebook/pages')
   @ApiQuery({ name: 'session', required: true })
@@ -174,18 +224,27 @@ export class PublishController {
     schema: { type: 'string', format: 'uuid' },
   })
   @ApiAcceptedResponse({ schema: apiSchema(PublicationSchema) })
+  @ApiBody({ required: false, schema: apiSchema(PublishInputSchema, 'input') })
   publish(
     @CurrentUser() user: AuthUser,
     @Param('projectId') projectId: string,
     @Param('contentId') contentId: string,
     @Headers('idempotency-key') key: string,
+    @Body(new SchemaPipe(PublishInputSchema)) input: PublishInput,
   ) {
     if (!z.uuid().safeParse(key).success)
       throw new BadRequestException({
         code: 'VALIDATION',
         message: 'Idempotency-Key must be UUID.',
       });
-    return this.service.publish(projectId, user.id, contentId, key);
+    return this.service.publish(
+      projectId,
+      user.id,
+      contentId,
+      key,
+      undefined,
+      input,
+    );
   }
 }
 

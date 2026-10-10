@@ -8,5 +8,6 @@ import { ContentService } from './content.service';
   imports: [ProjectsModule],
   controllers: [ContentController],
   providers: [ContentRepository, ContentService],
+  exports: [ContentRepository],
 })
 export class ContentModule {}

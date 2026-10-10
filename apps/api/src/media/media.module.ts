@@ -19,6 +19,6 @@ import { ImageProvider } from './image-provider';
     ImageProvider,
     QuotaService,
   ],
-  exports: [MediaStorage],
+  exports: [MediaStorage, MediaService, MediaRepository],
 })
 export class MediaModule {}

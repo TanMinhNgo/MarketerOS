@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MarketOS Web
 
-## Getting Started
+Next.js 16 (App Router) cho giao diện desktop của MarketOS: window manager, các app,
+Clerk UI và lớp gọi API. Backend NestJS nằm ở `apps/api`; web không gọi thẳng API mà đi qua
+rewrite cùng origin `/api/*` → `${API_URL}/api/*`, nên không cần CORS và cookie Clerk giữ cùng domain.
 
-First, run the development server:
+## Chạy local
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Từ root repo (xem [README gốc](../../README.md) để chuẩn bị database và API):
+
+```powershell
+npm ci
+cp apps/web/.env.example apps/web/.env.local   # điền key Clerk
+npm run dev                                    # API trước, web sau khi /api/health sẵn sàng
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Chạy riêng web (bỏ qua gate chờ API): `npm run build --workspace=@marketos/shared`
+rồi `npm run dev --workspace=web`. Mở `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Biến môi trường
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Biến | Bắt buộc | Ghi chú |
+|---|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Có | Cùng Clerk app với API. Production dùng key `pk_live_…` của Clerk production instance |
+| `CLERK_SECRET_KEY` | Có | `sk_live_…` ở production; chỉ đặt phía server |
+| `API_URL` | Có ở production | URL gốc của API trên Render, không có `/api` ở cuối (vd. `https://marketos-api.onrender.com`). Rewrite được tính **lúc build**, đổi biến này phải redeploy |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Có | `/apps/sign-in` (đăng nhập là một cửa sổ app) |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Có | `/apps/sign-up` |
 
-## Learn More
+## Kiểm tra
 
-To learn more about Next.js, take a look at the following resources:
+```powershell
+npm run lint --workspace=web
+npm run typecheck --workspace=web
+npm test --workspace=web
+npm run build --workspace=web
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy lên Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Cấu hình nằm trong [`vercel.json`](./vercel.json): cài dependency bằng `npm ci` ở root
+(một `package-lock.json` cho cả monorepo), build `@marketos/shared` rồi build web.
+Build gọi thẳng npm workspace thay vì `turbo run build` vì chế độ env strict của Turbo
+lọc bỏ `API_URL`/`CLERK_SECRET_KEY` không khai báo trong `turbo.json`.
 
-## Deploy on Vercel
+1. Vercel → **Add New Project** → import repo GitHub.
+2. **Root Directory**: `apps/web`. Framework tự nhận Next.js; giữ Install/Build Command theo `vercel.json`.
+3. **Node.js Version**: 24.x (repo yêu cầu Node `>=24.15 <25`).
+4. Thêm biến môi trường ở bảng trên cho Production (và Preview nếu cần), với `API_URL` trỏ tới API trên Render.
+5. Deploy. Sau khi có domain, thêm domain đó vào Clerk production instance (Domains) và cập nhật
+   URL webhook/allowed origins phía API nếu backend yêu cầu.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`next.config.ts` tắt `compress` để Next không đệm luồng SSE của Content Studio và AI Assistant;
+Vercel vẫn nén ở tầng CDN.

@@ -145,6 +145,7 @@ export const SECTIONS: DocSection[] = [
     body: (
       <>
         <P>A project holds everything for one brand: its Brand Brief, its saved content and its calendar. You need to be signed in.</P>
+        <Figure src="/docs/12-projects.png" alt="The Projects window with three project folders" caption="Each project is a folder. The selected one has a purple ring, and its name shows in the menu bar." />
         <H>Create a project</H>
         <Steps>
           <Step title="Open Projects">Double-click the Projects folder, or choose Projects in the menu bar.</Step>
@@ -173,6 +174,7 @@ export const SECTIONS: DocSection[] = [
     body: (
       <>
         <P>The Brand Brief belongs to the <strong>selected project</strong>. If none is selected, the app shows a button that opens Projects so you can pick one.</P>
+        <Figure src="/docs/13-brand-brief.png" alt="The Brand Brief form filled in for a café" caption="A filled-in Brand Brief. Key messages and words to avoid are added one at a time." />
         <Steps>
           <Step title="Select a project">Click a folder in Projects.</Step>
           <Step title="Open Brand Brief">Double-click its palette icon.</Step>
@@ -191,6 +193,7 @@ export const SECTIONS: DocSection[] = [
             ["Sample posts", "Paste posts you love so the AI can copy the style (up to 10)."],
             ["Brand colors", "Pick a colour and press Add color (up to 10)."],
             ["Visual style", "Describe the look of your imagery."],
+            ["References", "Below the form: up to 10 texts per project (up to 4,000 characters each) such as your menu, an FAQ or posts in your voice. Mark each as facts to use or a writing style to learn; untick On to leave it out of the next AI run."],
             ["Business address (optional)", "Used in the footer of email content. Leave it empty if you don't send email; the AI then leaves a placeholder for you to fill in."],
           ]}
         />
@@ -210,7 +213,9 @@ export const SECTIONS: DocSection[] = [
           <Step title="Describe the post">Fill in the goal and topic, and add notes if you like.</Step>
           <Step title="Generate">Three variants appear as the AI writes them. Press Stop to cancel.</Step>
           <Step title="Keep the best">Edit a variant in place, copy it, or press <strong>Save as draft</strong>. Not happy with one? Press <strong>Regenerate</strong> on that card to get a new version while the others stay. Regenerates are cheaper: every 3 count as 1 generation (the 1st of each 3 is counted, the next 2 are free), across all your projects each month.</Step>
+          <Step title="Add images (optional)">On a variant, press <strong>From library</strong> to pick images from the Media Library, or <strong>Create with AI</strong> to make one in your brief&apos;s style. They are attached when you save the draft.</Step>
         </Steps>
+        <Figure src="/docs/14-content-studio.png" alt="Content Studio with a generated variant and saved drafts" caption="Fill in the form and press Generate. Variants appear below it; saved drafts and their status are on the right." />
         <H>Review and approve</H>
         <P>Every saved draft starts as <strong>Needs review</strong>. Read it, press <strong>Approve</strong> and tick the checklist. Only approved content can go on the calendar.</P>
         <Callout kind="tip">If a draft still has text in brackets, such as [Business address] or {"{{unsubscribe_link}}"}, the checklist warns you to fill it in before posting.</Callout>
@@ -224,6 +229,7 @@ export const SECTIONS: DocSection[] = [
     summary: "Schedule approved content by dragging it onto a day.",
     body: (
       <>
+        <Figure src="/docs/15-content-calendar.png" alt="Content Calendar month view with scheduled posts" caption="Approved posts wait in Unscheduled on the left. Drag one onto a day to schedule it." />
         <Table
           head={["I want to…", "Do this"]}
           rows={[
@@ -235,6 +241,7 @@ export const SECTIONS: DocSection[] = [
             ["Switch views", "Use Month or Week at the top right, and the arrows or Today to move around."],
           ]}
         />
+        <Figure src="/docs/16-calendar-post.png" alt="Post details opened from the calendar" caption="Click a post to read it, add images, and change its status, date and time." />
         <Callout kind="note">Drafts that still need review show a dashed border and a Review tag. Approve them before they can be scheduled.</Callout>
       </>
     ),
@@ -250,8 +257,9 @@ export const SECTIONS: DocSection[] = [
           <Step title="Open AI Assistant">Double-click its chat-bubble icon. The project needs a Brand Brief.</Step>
           <Step title="Ask">Type a question or a request, then press Enter (Shift+Enter for a new line). Press Stop to cut a reply short.</Step>
           <Step title="Review suggestions">Under a reply you may see cards: a new draft, an edit to a post, a schedule, or a Brand Brief change, with what changes.</Step>
-          <Step title="Apply or dismiss">Nothing changes until you press <strong>Apply</strong>. Dismiss hides a suggestion.</Step>
+          <Step title="Apply or dismiss">Nothing changes until you press <strong>Apply</strong>. Dismiss hides a suggestion. If Apply stops halfway (for example the image couldn&apos;t be attached), the card shows <strong>Partly done</strong> with links to what was made; press <strong>Continue</strong> to finish without creating anything twice.</Step>
         </Steps>
+        <Figure src="/docs/17-ai-assistant.png" alt="AI Assistant chat with a suggested draft card" caption="The assistant replies and suggests a new draft with an image. Nothing changes until you press Apply." />
         <Table
           head={["Suggestion", "What Apply does"]}
           rows={[
@@ -280,6 +288,7 @@ export const SECTIONS: DocSection[] = [
           <Step title="Choose when it runs">Every day, on chosen weekdays or on a day of the month, at a time in your time zone.</Step>
           <Step title="Check the results">Open <strong>History</strong> on an automation to see each run and jump to the drafts, the calendar or the chat it touched. <strong>Run now</strong> tries it straight away.</Step>
         </Steps>
+        <Figure src="/docs/18-automations.png" alt="Automations list with three automations" caption="Each automation shows what it does and when it runs. Tick On to turn it on; History lists every run." />
         <Table
           head={["Type", "What it does"]}
           rows={[
@@ -300,6 +309,7 @@ export const SECTIONS: DocSection[] = [
     body: (
       <>
         <P>Reports shows the <strong>selected project</strong>. It counts every saved post, so it always matches Content Studio and the calendar.</P>
+        <Figure src="/docs/21-reports.png" alt="Reports with status tiles and posts by channel" caption="Tiles show where posts stand; click one to jump to where you act on it." />
         <Table
           head={["Section", "What it shows"]}
           rows={[
@@ -311,7 +321,6 @@ export const SECTIONS: DocSection[] = [
             ["Export CSV", "Downloads every post of the project (title, channel, status, dates, text, hashtags, call to action, post link and latest stats) as a CSV file that opens in Excel or Google Sheets."],
           ]}
         />
-        <Callout kind="note">Views, clicks and engagement per post will come once channels can be connected in Integrations.</Callout>
       </>
     ),
   },
@@ -322,24 +331,25 @@ export const SECTIONS: DocSection[] = [
     body: (
       <>
         <P>Each project keeps its own images. Uploads can be PNG, JPEG or WebP up to 10 MB.</P>
+        <Figure src="/docs/19-media-library.png" alt="Media Library with two AI images" caption="Images made with AI carry an AI badge. The header shows how many AI images you have used this month." />
         <Steps>
           <Step title="Add images">Press <strong>Upload</strong> or drop files on the Media Library window. Press <strong>Create with AI</strong> to describe an image; it follows the visual style and brand colors in your Brand Brief.</Step>
           <Step title="Attach to a post">In Content Studio (Edit) or on the calendar, open a post and press <strong>Add images</strong>. Pick up to 10, in the order they should appear.</Step>
           <Step title="Review again">Changing the images of an approved post sends it back to Needs review, so you see the final version before it goes out.</Step>
         </Steps>
-        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Facebook and LinkedIn publishing sends text only for now.</Callout>
+        <Callout kind="note">AI images count against your monthly limit (Free {PLAN_LIMITS.free.images}, Pro {PLAN_LIMITS.pro.images}, Max {PLAN_LIMITS.max.images}); uploads don&apos;t. Posts published to supported channels include their images, in the order you set. Instagram requires at least one image.</Callout>
       </>
     ),
   },
   {
     id: "integrations",
     title: "Integrations",
-    summary: "Connect Facebook and LinkedIn and publish approved posts (Pro).",
+    summary: "Connect configured Facebook, Instagram Professional and LinkedIn accounts (Pro).",
     body: (
       <>
-        <P>Integrations are part of <strong>Pro</strong> and <strong>Max</strong>. Each project connects its own accounts: one Facebook Page and one LinkedIn profile.</P>
+        <P>Integrations are part of <strong>Pro</strong> and <strong>Max</strong>. Each project connects its own accounts: one Facebook Page, one Instagram Professional account and one LinkedIn profile. Only channels configured by the workspace appear.</P>
         <Steps>
-          <Step title="Connect">Open Integrations and press Connect. Sign in on Facebook or LinkedIn and allow posting. If you manage several Facebook Pages, choose one.</Step>
+          <Step title="Connect">Open Integrations and press Connect. Sign in on the platform and allow posting. Instagram needs a Business or Creator account linked to a Facebook Page. If several accounts are available, choose one.</Step>
           <Step title="Approve and schedule">Approve a post and put it on the Content Calendar. Posts that still need review are never published.</Step>
           <Step title="It publishes">At the scheduled time MarketOS posts it, marks it Done and adds a link to the live post. Press <strong>Publish now</strong> to post an approved one straight away.</Step>
         </Steps>
@@ -351,7 +361,10 @@ export const SECTIONS: DocSection[] = [
             ["Disconnect", "Scheduled posts for that channel stop publishing. Posts already published stay where they are."],
           ]}
         />
-        <Callout kind="note">Instagram, TikTok and YouTube need images or video, so they come after the Media Library.</Callout>
+        <Callout kind="note">A post goes out with its text and up to 10 images, in the order you set. Before <strong>Publish now</strong> you see exactly what will be posted. While a post is being published you can&apos;t edit it. Instagram posts need at least one image. TikTok and YouTube aren&apos;t supported yet.</Callout>
+        <H>Email</H>
+        <P>If your MarketOS server has an email (SMTP) account set up, connect <strong>Email</strong> in Integrations. On an approved Email post, press <strong>Send email</strong>, type one recipient and check the preview (from, to, subject and text) before sending.</P>
+        <Callout kind="note">Emails are plain text: no images or hashtags, and fill in any text in brackets first. They are never sent automatically, even when scheduled. &ldquo;Accepted by SMTP&rdquo; means your email provider took the message, not that it reached the inbox. If a send fails, check your provider before sending again.</Callout>
       </>
     ),
   },
@@ -361,6 +374,7 @@ export const SECTIONS: DocSection[] = [
     summary: "Beach scene, animations, notifications and window layout.",
     body: (
       <>
+        <Figure src="/docs/23-settings.png" alt="Settings for the beach scene, animations and notifications" caption="Changes apply straight away; there is no Save button." />
         <Table
           head={["Setting", "What it does"]}
           rows={[
@@ -402,6 +416,7 @@ export const SECTIONS: DocSection[] = [
           <Step title="Read the plans">Free, Pro and Max are listed with price and everything each includes. Your current plan is marked once you are signed in.</Step>
         </Steps>
         <H>Manage your plan</H>
+        <Figure src="/docs/22-plans-billing.png" alt="Plans and Billing with the current plan and usage" caption="Your plan, next payment and this month's usage, each with when it resets." />
         <Table
           head={["I want to…", "Do this"]}
           rows={[
@@ -431,6 +446,7 @@ export const SECTIONS: DocSection[] = [
             ["Your 3 variants are ready", "AI finished writing while Content Studio was minimized, behind another window or in another tab."],
             ["Posting reminders", "A summary of today's scheduled posts, and a reminder 15 minutes before each one."],
             ["Account updates", "A project moved to Trash or restored, a Brand Brief saved, a plan cancelled."],
+            ["Problems to check", "A post couldn't publish or is taking long, a channel needs reconnecting, or an automation run failed. Checked about once a minute for the selected project; the item disappears once the problem is gone."],
           ]}
         />
         <Steps>
@@ -496,7 +512,7 @@ export const SECTIONS: DocSection[] = [
             ["I closed a project by mistake.", "Open Trash and press Restore, or press Undo in the toast right after deleting."],
             ["A window is off to the side after resizing my browser.", "Windows are pulled back inside the desktop automatically. Drag it by the title bar to reposition."],
             ["“Your session has expired.”", "Sign in again from the menu bar."],
-            ["“The server isn't ready.”", "The service is temporarily unavailable. Wait a moment and press Try again."],
+            ["“The server isn't ready.”", "The service is temporarily unavailable or waking up after a quiet period, which can take up to a minute. Wait a moment and press Try again."],
             ["The Taskbar is missing.", "It only appears while at least one app is open."],
           ]}
         />

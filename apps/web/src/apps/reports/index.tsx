@@ -95,7 +95,7 @@ function Performance({ projectId }: Readonly<{ projectId: string }>) {
   };
 
   let body: React.ReactNode;
-  if (!canPublish) body = <p className="text-sm text-muted-foreground">Part of Pro and Max: connect Facebook or LinkedIn, publish on schedule, and see each post&apos;s numbers here.</p>;
+  if (!canPublish) body = <p className="text-sm text-muted-foreground">Part of Pro and Max: connect a supported channel, publish on schedule, and see each post&apos;s numbers here.</p>;
   else if (pubs.isPending) body = <p className="text-sm text-muted-foreground">Loading…</p>;
   else if (pubs.error) body = <p className="text-sm text-destructive">{errorMessage(pubs.error)}</p>;
   else if (!published.length)
@@ -143,7 +143,7 @@ function Performance({ projectId }: Readonly<{ projectId: string }>) {
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Facebook numbers refresh every 6 hours for posts from the last 30 days. LinkedIn doesn&apos;t share post stats with apps, so its rows show —.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Facebook numbers refresh every 6 hours for posts from the last 30 days. Only Facebook metrics are synced in MarketOS; other channels show —.</p>
       </>
     );
 

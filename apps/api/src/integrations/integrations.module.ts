@@ -11,6 +11,7 @@ import { IntegrationCrypto } from './integration-crypto';
 import { IntegrationsGuard } from './integrations.guard';
 import { IntegrationsService } from './integrations.service';
 import { ProviderGateway } from './provider.gateway';
+import { SmtpService } from './smtp.service';
 
 @Module({
   imports: [ProjectsModule, AuthModule],
@@ -25,7 +26,8 @@ import { ProviderGateway } from './provider.gateway';
     IntegrationsGuard,
     IntegrationsService,
     ProviderGateway,
+    SmtpService,
   ],
-  exports: [IntegrationsService, ProviderGateway],
+  exports: [IntegrationsService, ProviderGateway, SmtpService],
 })
 export class IntegrationsModule {}

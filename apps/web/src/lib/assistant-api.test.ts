@@ -1,143 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AssistantAction, BrandBriefResponse, ContentResponse } from "@marketos/shared";
 
 vi.mock("@clerk/nextjs", () => ({ getToken: vi.fn(async () => "t") }));
 
 import { ApiError } from "./api-client";
-import { applyAction, mergeAssetIds, mergeBrief, sendMessage } from "./assistant-api";
-
-const content = (status: ContentResponse["status"], scheduledAt: string | null = null): ContentResponse => ({
-  id: "c1", projectId: "p", generationId: null, channel: "FACEBOOK", title: "T", body: "B", hashtags: [], cta: null, status, scheduledAt, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z",
-});
-const brief: BrandBriefResponse = {
-  id: "b", projectId: "p", product: "P", audience: "A", tone: "friendly", language: "vi", businessAddress: null, keyMessages: ["k"], avoidWords: [], samplePosts: [], brandColors: [], visualStyle: null, createdAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-01T00:00:00.000Z",
-};
-const at = "2026-10-12T09:00:00.000Z";
-
-/** fetch giả: GET trả `get`, ghi lại các lời gọi ghi (POST/PATCH/PUT). */
-function server(get: unknown) {
-  const writes: { method: string; url: string; body: unknown }[] = [];
-  vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-    if ((init.method ?? "GET") === "GET") return Response.json(get);
-    const body = JSON.parse(String(init.body));
-    writes.push({ method: init.method!, url, body });
-    return Response.json(url.includes("brand-brief") ? { ...brief, ...body } : { ...content("DRAFT"), ...body });
-  }));
-  return writes;
-}
+import { applyAction, applyProgress, sendMessage } from "./assistant-api";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("applyAction", () => {
-  const schedule: AssistantAction = { type: "schedule", id: "a", status: "proposed", contentId: "c1", scheduledAt: at };
+  const done = { actionId: "a", status: "applied", contentId: "c1", assetId: null, errorCode: null, updatedAt: "2026-10-08T00:00:00.000Z" };
 
-  it("lên lịch bài đã duyệt: READY → SCHEDULED", async () => {
-    const writes = server(content("READY"));
-    await applyAction("p", schedule);
-    expect(writes).toEqual([{ method: "PATCH", url: "/api/projects/p/contents/c1", body: { status: "SCHEDULED", scheduledAt: at } }]);
-  });
-
-  it("không bao giờ lên lịch bài chưa duyệt", async () => {
-    const writes = server(content("DRAFT"));
-    await expect(applyAction("p", schedule)).rejects.toBeInstanceOf(ApiError);
-    expect(writes).toEqual([]);
-  });
-
-  it("bài Done chỉ dời ngày, không đổi trạng thái", async () => {
-    const writes = server(content("DONE", "2026-10-01T09:00:00.000Z"));
-    await applyAction("p", schedule);
-    expect(writes[0].body).toEqual({ status: "DONE", scheduledAt: at });
-  });
-
-  it("sửa bài chỉ gửi đúng các trường được đề xuất", async () => {
-    const writes = server(null);
-    await applyAction("p", { type: "edit_content", id: "a", status: "proposed", contentId: "c1", body: "New" });
-    expect(writes).toEqual([{ method: "PATCH", url: "/api/projects/p/contents/c1", body: { body: "New" } }]);
-  });
-
-  it("tạo nháp không gửi id/status/type của action", async () => {
-    const writes = server(null);
-    await applyAction("p", { type: "create_draft", id: "a", status: "proposed", channel: "TIKTOK", title: "T", body: "B", hashtags: ["#x"], cta: null });
-    expect(writes[0]).toEqual({ method: "POST", url: "/api/projects/p/contents", body: { channel: "TIKTOK", title: "T", body: "B", hashtags: ["#x"], cta: null } });
-  });
-
-  it("sửa brief: lấy brief mới nhất, gộp thay đổi, PUT đủ trường", async () => {
-    const writes = server(brief);
-    await applyAction("p", { type: "update_brief", id: "a", status: "proposed", changes: { tone: "bold" } });
-    expect(writes[0].method).toBe("PUT");
-    expect(writes[0].body).toMatchObject({ product: "P", tone: "bold", keyMessages: ["k"], language: "vi" });
-    expect(writes[0].body).not.toHaveProperty("id");
-  });
-});
-
-describe("ảnh (attach_media / generate_image)", () => {
-  const asset = (id: string) => ({ id, projectId: "p", generationId: null, kind: "IMAGE", name: id, mimeType: "image/png", byteSize: "10", width: 1, height: 1, altText: null, createdAt: at, updatedAt: at });
-
-  it("mergeAssetIds: append giữ ảnh cũ, bỏ trùng, thêm cuối; replace thay hết; quá 10 thì báo lỗi", () => {
-    expect(mergeAssetIds(["a", "b"], ["b", "c"], "append")).toEqual(["a", "b", "c"]);
-    expect(mergeAssetIds(["a", "b"], ["c"], "replace")).toEqual(["c"]);
-    expect(() => mergeAssetIds(Array.from({ length: 9 }, (_, i) => `x${i}`), ["y", "z"], "append")).toThrow(ApiError);
-  });
-
-  it("gắn ảnh (append): đọc ảnh hiện có rồi PUT danh sách đã ghép", async () => {
-    const writes: { method: string; url: string; body: unknown }[] = [];
+  it("POST một lần tới endpoint Apply của backend, không body, không tự gọi API khác", async () => {
+    const calls: { method: string; url: string; body: unknown }[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      if ((init.method ?? "GET") === "GET") return Response.json({ items: [asset("a")] });
-      writes.push({ method: init.method!, url, body: JSON.parse(String(init.body)) });
-      return Response.json({ items: [] });
+      calls.push({ method: init.method ?? "GET", url, body: init.body });
+      return Response.json(done);
     }));
-    await applyAction("p", { type: "attach_media", id: "x", status: "proposed", contentId: "c1", assetIds: ["a", "b"], mode: "append" });
-    expect(writes).toEqual([{ method: "PUT", url: "/api/projects/p/contents/c1/assets", body: { assetIds: ["a", "b"] } }]);
+    await expect(applyAction("p", "m", "a")).resolves.toEqual(done);
+    expect(calls).toEqual([{ method: "POST", url: "/api/projects/p/assistant/messages/m/actions/a/apply", body: undefined }]);
   });
 
-  it("tạo nháp kèm ảnh: tạo bài → tạo ảnh mới → gắn ảnh có sẵn + ảnh mới (replace)", async () => {
-    const calls: string[] = [];
-    let put: unknown;
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      const method = init.method ?? "GET";
-      calls.push(`${method} ${url}`);
-      if (url.endsWith("/images/generate")) return Response.json(asset("new"), { status: 201 });
-      if (url.endsWith("/contents")) return Response.json(content("DRAFT"), { status: 201 });
-      put = JSON.parse(String(init.body));
-      return Response.json({ items: [] });
-    }));
-    await applyAction("p", { type: "create_draft", id: "x", status: "proposed", channel: "FACEBOOK", title: "T", body: "B", hashtags: [], cta: null, assetIds: ["a"], imagePrompt: "Coffee" });
-    expect(calls).toEqual(["POST /api/projects/p/contents", "POST /api/projects/p/images/generate", "PUT /api/projects/p/contents/c1/assets"]);
-    expect(put).toEqual({ assetIds: ["a", "new"] });
-  });
-
-  it("sửa bài chỉ có ảnh: không PATCH nội dung, chỉ ghép ảnh (append)", async () => {
-    const calls: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      const method = init.method ?? "GET";
-      calls.push(`${method} ${url}`);
-      return Response.json({ items: method === "GET" ? [asset("old")] : [] });
-    }));
-    await applyAction("p", { type: "edit_content", id: "x", status: "proposed", contentId: "c1", assetIds: ["b"] });
-    expect(calls).toEqual(["GET /api/projects/p/contents/c1/assets", "PUT /api/projects/p/contents/c1/assets"]);
-  });
-
-  it("tạo ảnh có bài đích: POST generate (Idempotency-Key) rồi thêm ảnh mới vào cuối bài", async () => {
-    const calls: { method: string; url: string; key?: string }[] = [];
-    let put: unknown;
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      const method = init.method ?? "GET";
-      calls.push({ method, url, key: (init.headers as Record<string, string>)["Idempotency-Key"] });
-      if (url.endsWith("/images/generate")) return Response.json(asset("new"), { status: 201 });
-      if (method === "GET") return Response.json({ items: [asset("old")] });
-      put = JSON.parse(String(init.body));
-      return Response.json({ items: [] });
-    }));
-    await applyAction("p", { type: "generate_image", id: "x", status: "proposed", prompt: "Coffee", size: "1024x1024", attachToContentId: "c1" });
-    expect(calls[0]).toMatchObject({ method: "POST", url: "/api/projects/p/images/generate" });
-    expect(calls[0].key).toMatch(/^[0-9a-f-]{36}$/);
-    expect(put).toEqual({ assetIds: ["old", "new"] });
-  });
-});
-
-describe("mergeBrief", () => {
-  it("bỏ trường của server, giữ trường không đổi", () => {
-    expect(mergeBrief(brief, { language: "en" })).toEqual({ product: "P", audience: "A", tone: "friendly", language: "en", businessAddress: null, keyMessages: ["k"], avoidWords: [], samplePosts: [], brandColors: [], visualStyle: null });
+  it("GET tiến độ cùng URL; lỗi 409 giữ mã CONFLICT để thẻ hiện lại phần đã xong", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) =>
+      init.method === "POST" ? Response.json({ code: "CONFLICT", message: "Post changed", details: null }, { status: 409 }) : Response.json({ ...done, status: "partial" }),
+    ));
+    await expect(applyAction("p", "m", "a")).rejects.toMatchObject({ code: "CONFLICT" } satisfies Partial<ApiError>);
+    expect((await applyProgress("p", "m", "a")).status).toBe("partial");
   });
 });
 

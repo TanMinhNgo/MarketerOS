@@ -11,6 +11,7 @@ import {
   PublicationSchema,
   PublicationsResponseSchema,
   ProjectResponseSchema,
+  IntegrationProvidersResponseSchema,
   type FeatureKey,
   type PlanKey,
 } from '@marketos/shared';
@@ -24,6 +25,8 @@ import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PublicationWorker } from '../src/integrations/publication.worker';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { configureApp } from '../src/common/configure-app';
+import { MediaStorage } from '../src/media/media.storage';
+import { SmtpService } from '../src/integrations/smtp.service';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 suite('Phase 10 integrations', () => {
@@ -40,6 +43,17 @@ suite('Phase 10 integrations', () => {
       [free]: { plan: 'free', features: [] },
     };
   const auth = (id = pro) => ({ Authorization: `Bearer ${id}` });
+  const smtp = {
+    configured: () => true,
+    settings: () => ({ from: 'sender@example.com' }),
+    verify: jest.fn().mockResolvedValue({
+      address: 'sender@example.com',
+      name: 'Test sender',
+    }),
+    send: jest
+      .fn()
+      .mockResolvedValue({ id: '<message@example.com>', url: null }),
+  };
   const publishProvider = jest.fn().mockImplementation((channel: string) =>
     Promise.resolve(
       channel === 'LINKEDIN'
@@ -52,6 +66,7 @@ suite('Phase 10 integrations', () => {
   );
   let liveEntitled = true;
   const providers = {
+    configured: (provider: string) => provider !== 'linkedin',
     authorize: (_provider: string, state: string) =>
       `https://provider.example/authorize?state=${encodeURIComponent(state)}`,
     exchange: () =>
@@ -135,6 +150,8 @@ suite('Phase 10 integrations', () => {
       .useValue(clerk)
       .overrideProvider(ProviderGateway)
       .useValue(providers)
+      .overrideProvider(SmtpService)
+      .useValue(smtp)
       .compile();
     prisma = module.get(PrismaService);
     worker = new PublicationWorker(
@@ -143,6 +160,8 @@ suite('Phase 10 integrations', () => {
       module.get(IntegrationsService),
       providers as unknown as ProviderGateway,
       clerk as unknown as ClerkGateway,
+      module.get(MediaStorage),
+      module.get(SmtpService),
     );
     app = module.createNestApplication({ rawBody: true });
     configureApp(app);
@@ -165,6 +184,10 @@ suite('Phase 10 integrations', () => {
           .expect(201)
       ).body,
     ).id;
+  });
+  afterEach(() => {
+    publishProvider.mockClear();
+    jest.restoreAllMocks();
   });
   afterAll(async () => {
     if (prisma) {
@@ -254,6 +277,7 @@ suite('Phase 10 integrations', () => {
       'member_1',
       'super-secret-token',
       'Text only',
+      [],
     );
     expect(
       (
@@ -263,6 +287,389 @@ suite('Phase 10 integrations', () => {
       ).status,
     ).toBe('PUBLISHED');
     publishProvider.mockClear();
+  });
+
+  it('publishes the provider catalog without credentials and rejects unsupported connections', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`${connectionPath()}/providers`)
+      .set(auth())
+      .expect(200);
+    const catalog = IntegrationProvidersResponseSchema.parse(response.body);
+    expect(catalog.items.map((item) => item.provider)).toEqual([
+      'facebook',
+      'instagram',
+      'linkedin',
+      'smtp',
+    ]);
+    expect(
+      catalog.items.find((item) => item.provider === 'linkedin')?.configured,
+    ).toBe(false);
+    expect(JSON.stringify(response.body)).not.toContain('secret');
+    await request(app.getHttpServer())
+      .get(`${connectionPath()}/providers`)
+      .set(auth(free))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`${connectionPath()}/providers`)
+      .set(auth(other))
+      .expect(404);
+    for (const provider of ['tiktok', 'youtube', 'email', 'blog'])
+      await request(app.getHttpServer())
+        .post(`${connectionPath()}/${provider}/start`)
+        .set(auth())
+        .expect(400);
+  });
+
+  it('connects SMTP with ownership and entitlement checks, without storing credentials', async () => {
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp`)
+      .set(auth(free))
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp`)
+      .set(auth(other))
+      .expect(404);
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp/start`)
+      .set(auth())
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp`)
+      .set(auth())
+      .send({ password: 'not-accepted' })
+      .expect(400);
+    const response = await request(app.getHttpServer())
+      .post(`${connectionPath()}/smtp`)
+      .set(auth())
+      .expect(201);
+    const connection = ConnectionSchema.parse(response.body);
+    expect(connection.channel).toBe('EMAIL');
+    expect(
+      await prisma.integrationCredential.findUnique({
+        where: { connectionId: connection.id },
+      }),
+    ).toBeNull();
+    expect(smtp.verify).toHaveBeenCalledTimes(1);
+  });
+
+  it('freezes the email recipient, replays safely, sends once and records SMTP acceptance', async () => {
+    const content = await prisma.contentItem.create({
+      data: {
+        projectId,
+        channel: 'EMAIL',
+        title: 'Tin mới',
+        body: 'Xin chào!',
+        status: 'READY',
+      },
+    });
+    const path = `/api/projects/${projectId}/contents/${content.id}/publish`;
+    const key = randomUUID();
+    await request(app.getHttpServer())
+      .post(path)
+      .set(auth())
+      .set('Idempotency-Key', key)
+      .expect(400);
+    await request(app.getHttpServer())
+      .post(path)
+      .set(auth())
+      .set('Idempotency-Key', key)
+      .send({ email: { to: 'reader@example.com\r\nBcc: victim@example.com' } })
+      .expect(400);
+    const send = () =>
+      request(app.getHttpServer())
+        .post(path)
+        .set(auth())
+        .set('Idempotency-Key', key)
+        .send({ email: { to: 'reader@example.com' } });
+    const queued = PublicationSchema.parse((await send().expect(202)).body);
+    expect(PublicationSchema.parse((await send().expect(202)).body).id).toBe(
+      queued.id,
+    );
+    await request(app.getHttpServer())
+      .post(path)
+      .set(auth())
+      .set('Idempotency-Key', key)
+      .send({ email: { to: 'other@example.com' } })
+      .expect(409);
+    await worker.execute(queued.id);
+    await worker.execute(queued.id);
+    expect(smtp.send).toHaveBeenCalledTimes(1);
+    expect(smtp.send).toHaveBeenLastCalledWith(
+      {
+        to: 'reader@example.com',
+        from: 'sender@example.com',
+        subject: 'Tin mới',
+        text: 'Xin chào!',
+      },
+      queued.id,
+      'sender@example.com',
+    );
+    expect(
+      PublicationSchema.parse((await send().expect(202)).body).status,
+    ).toBe('PUBLISHED');
+    expect(
+      (
+        await prisma.contentItem.findUniqueOrThrow({
+          where: { id: content.id },
+        })
+      ).status,
+    ).toBe('DONE');
+    expect(publishProvider).not.toHaveBeenCalled();
+  });
+
+  it('rejects unresolved email templates and does not schedule email without a recipient', async () => {
+    const scheduledAt = new Date(Date.now() - 1000);
+    const content = await prisma.contentItem.create({
+      data: {
+        projectId,
+        channel: 'EMAIL',
+        title: 'News',
+        body: 'Footer {{unsubscribe_link}}',
+        status: 'SCHEDULED',
+        scheduledAt,
+      },
+    });
+    await worker.reserveScheduled();
+    expect(
+      await prisma.publication.count({ where: { contentId: content.id } }),
+    ).toBe(0);
+    await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/contents/${content.id}/publish`)
+      .set(auth())
+      .set('Idempotency-Key', randomUUID())
+      .send({ email: { to: 'reader@example.com' } })
+      .expect(400);
+    await prisma.contentItem.update({
+      where: { id: content.id },
+      data: { title: 'News\r\nBcc: attacker@example.com', body: 'Hello' },
+    });
+    await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/contents/${content.id}/publish`)
+      .set(auth())
+      .set('Idempotency-Key', randomUUID())
+      .send({ email: { to: 'reader@example.com' } })
+      .expect(400);
+  });
+
+  it('marks an ambiguous SMTP send failed and never resends it automatically', async () => {
+    const content = await prisma.contentItem.create({
+      data: {
+        projectId,
+        channel: 'EMAIL',
+        title: 'News',
+        body: 'Hello',
+        status: 'READY',
+      },
+    });
+    const response = await request(app.getHttpServer())
+      .post(`/api/projects/${projectId}/contents/${content.id}/publish`)
+      .set(auth())
+      .set('Idempotency-Key', randomUUID())
+      .send({ email: { to: 'reader@example.com' } })
+      .expect(202);
+    smtp.send.mockClear();
+    const publication = PublicationSchema.parse(response.body);
+    smtp.send.mockRejectedValueOnce(
+      new ProviderError('PROVIDER_ERROR', false, true),
+    );
+    await worker.execute(publication.id);
+    await worker.execute(publication.id);
+    expect(smtp.send).toHaveBeenCalledTimes(1);
+    expect(
+      await prisma.publication.findUniqueOrThrow({
+        where: { id: publication.id },
+      }),
+    ).toMatchObject({
+      status: 'FAILED',
+      attempts: 1,
+      nextAttemptAt: null,
+      errorCode: 'PROVIDER_ERROR',
+    });
+    const connection = await prisma.channelConnection.findFirstOrThrow({
+      where: { projectId, channel: 'EMAIL', status: 'CONNECTED' },
+    });
+    await request(app.getHttpServer())
+      .delete(`${connectionPath()}/${connection.id}`)
+      .set(auth())
+      .expect(204);
+  });
+
+  it('connects Instagram securely, requires media, and schedules image publication', async () => {
+    providers.facebookPages.mockResolvedValueOnce([
+      {
+        id: 'ig_1',
+        name: 'coffee',
+        avatarUrl: null,
+        accessToken: 'ig-page-secret',
+      },
+    ]);
+    const start = OAuthStartResponseSchema.parse(
+      (
+        await request(app.getHttpServer())
+          .post(`${connectionPath()}/instagram/start`)
+          .set(auth())
+          .expect(201)
+      ).body,
+    );
+    const state = new URL(start.authUrl).searchParams.get('state')!;
+    await request(app.getHttpServer())
+      .get('/api/oauth/instagram/callback')
+      .query({ state, code: 'code' })
+      .expect(302);
+    await request(app.getHttpServer())
+      .get('/api/oauth/instagram/callback')
+      .query({ state, code: 'code' })
+      .expect(302)
+      .then((response) =>
+        expect(response.headers.location).toContain('INVALID_STATE'),
+      );
+    const connections = ConnectionsResponseSchema.parse(
+      (
+        await request(app.getHttpServer())
+          .get(connectionPath())
+          .set(auth())
+          .expect(200)
+      ).body,
+    );
+    const connection = connections.items.find(
+      (item) => item.channel === 'INSTAGRAM',
+    )!;
+    expect(connection.displayName).toBe('coffee');
+    expect(JSON.stringify(connection)).not.toContain('ig-page-secret');
+    const post = await prisma.contentItem.create({
+      data: {
+        projectId,
+        channel: 'INSTAGRAM',
+        title: 'Coffee',
+        body: 'Caption',
+        status: 'READY',
+      },
+    });
+    const publishPath = `/api/projects/${projectId}/contents/${post.id}/publish`;
+    await request(app.getHttpServer())
+      .post(publishPath)
+      .set(auth())
+      .set('Idempotency-Key', randomUUID())
+      .expect(409);
+    const image = await prisma.asset.create({
+      data: {
+        projectId,
+        kind: 'IMAGE',
+        name: 'Coffee',
+        storageKey: 'ig-file',
+        mimeType: 'image/png',
+        byteSize: 1n,
+        width: 8,
+        height: 8,
+      },
+    });
+    await prisma.contentAsset.create({
+      data: { contentId: post.id, assetId: image.id, position: 0 },
+    });
+    jest
+      .spyOn(app.get(MediaStorage), 'instagramImageUrl')
+      .mockResolvedValue('https://ik.example/signed.jpg');
+    const scheduledAt = new Date(Date.now() - 1000);
+    await prisma.contentItem.update({
+      where: { id: post.id },
+      data: { status: 'SCHEDULED', scheduledAt },
+    });
+    await worker.reserveScheduled();
+    const publication = await prisma.publication.findFirstOrThrow({
+      where: { contentId: post.id },
+    });
+    await worker.execute(publication.id);
+    expect(publishProvider).toHaveBeenLastCalledWith(
+      'INSTAGRAM',
+      'ig_1',
+      'ig-page-secret',
+      'Caption',
+      [],
+      ['https://ik.example/signed.jpg'],
+    );
+    expect(
+      (
+        await prisma.publication.findUniqueOrThrow({
+          where: { id: publication.id },
+        })
+      ).status,
+    ).toBe('PUBLISHED');
+    const revoke = jest.spyOn(providers, 'revoke');
+    await request(app.getHttpServer())
+      .delete(`${connectionPath()}/${connection.id}`)
+      .set(auth())
+      .expect(204);
+    expect(revoke).not.toHaveBeenCalled();
+    revoke.mockRestore();
+  });
+
+  it('keeps Instagram account selection sessions separate from Facebook', async () => {
+    providers.facebookPages.mockResolvedValueOnce([
+      {
+        id: 'ig_a',
+        name: 'first',
+        avatarUrl: null,
+        accessToken: 'first-secret',
+      },
+      {
+        id: 'ig_b',
+        name: 'second',
+        avatarUrl: null,
+        accessToken: 'second-secret',
+      },
+    ]);
+    const start = OAuthStartResponseSchema.parse(
+      (
+        await request(app.getHttpServer())
+          .post(`${connectionPath()}/instagram/start`)
+          .set(auth())
+          .expect(201)
+      ).body,
+    );
+    const callback = await request(app.getHttpServer())
+      .get('/api/oauth/instagram/callback')
+      .query({
+        state: new URL(start.authUrl).searchParams.get('state'),
+        code: 'code',
+      })
+      .expect(302);
+    const url = new URL(callback.headers.location);
+    expect(url.searchParams.get('provider')).toBe('instagram');
+    const session = url.searchParams.get('session')!;
+    await request(app.getHttpServer())
+      .get(`${connectionPath()}/facebook/pages`)
+      .query({ session })
+      .set(auth())
+      .expect(404);
+    const accounts = await request(app.getHttpServer())
+      .get(`${connectionPath()}/instagram/accounts`)
+      .query({ session })
+      .set(auth())
+      .expect(200);
+    expect(JSON.stringify(accounts.body)).not.toContain('secret');
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/instagram/accounts`)
+      .set(auth())
+      .send({ session, pageId: 'foreign' })
+      .expect(400);
+    const selected = await request(app.getHttpServer())
+      .post(`${connectionPath()}/instagram/accounts`)
+      .set(auth())
+      .send({ session, pageId: 'ig_b' })
+      .expect(201);
+    expect(ConnectionSchema.parse(selected.body).channel).toBe('INSTAGRAM');
+    await request(app.getHttpServer())
+      .post(`${connectionPath()}/instagram/accounts`)
+      .set(auth())
+      .send({ session, pageId: 'ig_b' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete(`${connectionPath()}/${ConnectionSchema.parse(selected.body).id}`)
+      .set(auth())
+      .expect(204);
   });
   it('rejects drafts, publishes approved content once and preserves history after disconnect', async () => {
     const connection = await prisma.channelConnection.findFirstOrThrow({

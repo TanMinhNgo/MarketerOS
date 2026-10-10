@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWindowStore } from "@/desktop/window-store";
 import { errorMessage } from "@/lib/api-client";
+import { isPublishing, usePublications } from "@/lib/integrations-api";
 import { MAX_PER_POST, useAssets, useContentAssets, useSetContentAssets } from "@/lib/media-api";
 import { notify } from "@/lib/notify/notify";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,9 @@ export function PostMedia({ projectId, item }: Readonly<{ projectId: string; ite
   const [picking, setPicking] = useState(false);
   const ids = media.data?.items.map((a) => a.id) ?? [];
   const approved = item.status === "READY" || item.status === "SCHEDULED";
-  const locked = item.status === "DONE";
+  // Bài Done hoặc đang được đăng thì không đổi ảnh được.
+  const publishing = isPublishing(usePublications(projectId).data, item.id);
+  const locked = item.status === "DONE" || publishing;
 
   const apply = (next: string[], done?: () => void) =>
     save.mutate(next, {
@@ -106,7 +109,8 @@ export function PostMedia({ projectId, item }: Readonly<{ projectId: string; ite
           ))}
         </ul>
       )}
-      {approved && !locked && <p className="text-xs text-muted-foreground">Changing images sends an approved post back to Needs review.</p>}
+      {approved && !locked && <p className="text-xs text-muted-foreground">Changing images sends an approved post back to Needs review and cancels a queued publish.</p>}
+      {publishing && <p className="text-xs text-muted-foreground">Being published now. You can edit it again once it&apos;s done.</p>}
       {picking && <ImagePicker projectId={projectId} initial={ids} saving={save.isPending} onClose={() => setPicking(false)} onSave={(next) => apply(next, () => setPicking(false))} />}
     </div>
   );

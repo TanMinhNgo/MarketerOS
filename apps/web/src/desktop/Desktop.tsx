@@ -8,6 +8,7 @@ import { DesktopIcons } from "./DesktopIcons";
 import { MenuBar } from "./MenuBar";
 import { MobileHome } from "./MobileHome";
 import { MobileSheet } from "./MobileSheet";
+import { useOperationalAlerts } from "./notifications/use-operational-alerts";
 import { useScheduleReminders } from "./notifications/use-schedule-reminders";
 import { SearchPalette } from "./search/SearchPalette";
 import { Taskbar } from "./Taskbar";
@@ -29,6 +30,7 @@ export function Desktop({ skyMinutes }: Readonly<{ skyMinutes: number }>) {
   const open = useWindowStore((s) => s.open);
   useUrlSync();
   useScheduleReminders();
+  useOperationalAlerts();
   // Thông báo trong chuông thuộc về từng tài khoản Clerk.
   const { user } = useUser();
   useEffect(() => useNotifications.getState().setUser(user?.id ?? null), [user?.id]);

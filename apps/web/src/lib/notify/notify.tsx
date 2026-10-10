@@ -21,15 +21,17 @@ export interface NotifyOptions {
   /** App mở khi bấm vào mục trong chuông; mặc định lấy từ action. */
   appId?: string;
   duration?: number;
+  /** ID cố định của mục trong chuông (để gỡ khi nguồn đã hết, vd. cảnh báo vận hành). */
+  id?: string;
 }
 
 /** Một cổng duy nhất cho mọi thông báo: toast, chuông và thông báo hệ điều hành. */
-export function notify({ kind = "info", title, description, action, persist, os, silent, appId, duration }: NotifyOptions) {
+export function notify({ kind = "info", title, description, action, persist, os, silent, appId, duration, id }: NotifyOptions) {
   const ms = duration ?? (kind === "error" ? 8000 : kind === "reminder" ? 10000 : 5000);
   if (!silent) toast.custom((id) => <ToastCard id={id} kind={kind} title={title} description={description} action={action} duration={ms} />, { duration: ms });
 
   const target = appId ?? action?.appId;
-  if (persist) useNotifications.getState().add({ kind, title, description, appId: target });
+  if (persist) useNotifications.getState().add({ id, kind, title, description, appId: target });
   if (os && useNotifications.getState().prefs.os) {
     showOsNotification(title, description, `${kind}:${title}`, target ? () => useWindowStore.getState().open(target) : undefined);
   }

@@ -1,9 +1,9 @@
 "use client";
 
 import type { AssistantAction, AssistantMessage, AssistantMessagesResponse } from "@marketos/shared";
-import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { applyAction, clearMessages, fetchMessages, markAction, sendMessage } from "@/lib/assistant-api";
+import { applyAction, applyProgress, clearMessages, fetchMessages, markAction, sendMessage } from "@/lib/assistant-api";
 import { notify } from "@/lib/notify/notify";
 import { keys } from "@/lib/queries";
 
@@ -82,40 +82,39 @@ const APPLIED: Record<AssistantAction["type"], Parameters<typeof notify.success>
   attach_media: ["Images added to the post", { action: { label: "Open Content Studio", appId: "content-studio" } }],
 };
 
-/** Hành động đã chạy nhưng không lưu được nhãn `applied`: không cho bấm Apply lại (tránh tạo trùng). */
-export class AppliedButNotMarked extends Error {}
+export const applyKey = (projectId: string, messageId: string, actionId: string) => ["assistant-apply", projectId, messageId, actionId] as const;
 
-/** Apply: chạy hành động bằng API sẵn có rồi mới đánh dấu `applied`; lỗi thì action vẫn `proposed`. */
-export function useActionStatus(projectId: string, messageId: string) {
+/**
+ * Apply do backend thực hiện và lưu tiến độ. Action còn `proposed` đọc tiến độ đã lưu để khôi phục sau reload;
+ * lỗi thì đọc lại tiến độ (không gọi Apply lần nữa) để hiện phần đã xong. Gọi lại cùng message/action không tạo trùng.
+ */
+export function useAction(projectId: string, messageId: string, action: AssistantAction) {
   const qc = useQueryClient();
-  // Apply có thể đổi bài, brief, thư viện ảnh / ảnh của bài và lượt ảnh AI.
-  const refreshTargets = () =>
+  const key = applyKey(projectId, messageId, action.id);
+  const progress = useQuery({ queryKey: key, queryFn: () => applyProgress(projectId, messageId, action.id), enabled: action.status === "proposed", staleTime: Infinity });
+  // Apply có thể đổi bài, lịch, brief, thư viện ảnh / ảnh của bài và lượt ảnh AI.
+  const refresh = () =>
     void Promise.all(
-      [keys.contents(projectId), keys.brief(projectId), ["assets", projectId], ["content-assets", projectId], keys.usage].map((queryKey) => qc.invalidateQueries({ queryKey })),
+      [assistantKey(projectId), keys.contents(projectId), keys.brief(projectId), ["assets", projectId], ["content-assets", projectId], keys.usage].map((queryKey) => qc.invalidateQueries({ queryKey })),
     );
-  return useMutation({
+  const apply = useMutation({
     meta: { silent: true },
-    mutationFn: async ({ action, status }: { action: AssistantAction; status: "applied" | "dismissed" }) => {
-      if (status === "applied") await applyAction(projectId, action);
-      try {
-        return await markAction(projectId, messageId, action.id, status);
-      } catch (e) {
-        if (status === "applied") throw new AppliedButNotMarked("Applied, but the chat couldn't record it.");
-        throw e;
-      }
+    mutationFn: () => applyAction(projectId, messageId, action.id),
+    onSuccess: (result) => {
+      qc.setQueryData(key, result);
+      refresh();
+      if (result.status === "applied") notify.success(...APPLIED[action.type]);
     },
-    onSuccess: (message, { action, status }) => {
-      qc.setQueryData<History>(assistantKey(projectId), (d) => replaceMessage(d, message));
-      if (status === "applied") {
-        refreshTargets();
-        notify.success(...APPLIED[action.type]);
-      }
-    },
-    onError: (e) => {
-      if (e instanceof AppliedButNotMarked) {
-        refreshTargets();
-        notify.warning("Applied, but not marked", { description: e.message });
-      } else notify.apiError("Couldn't apply the suggestion", e);
+    onError: () => {
+      // Có thể một phần đã xong (bài/ảnh đã tạo): đọc tiến độ và làm mới dữ liệu liên quan.
+      void qc.invalidateQueries({ queryKey: key });
+      refresh();
     },
   });
+  const dismiss = useMutation({
+    meta: { silent: true },
+    mutationFn: () => markAction(projectId, messageId, action.id, "dismissed"),
+    onSuccess: (message) => qc.setQueryData<History>(assistantKey(projectId), (d) => replaceMessage(d, message)),
+  });
+  return { progress, apply, dismiss };
 }

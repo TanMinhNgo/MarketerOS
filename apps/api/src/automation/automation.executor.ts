@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { textReferences } from '../references/references.service';
 import {
   ContentLanguageSchema,
   type AssistantAction,
@@ -107,6 +108,7 @@ export class AutomationExecutor {
         run,
         brief,
         context: {
+          references: await textReferences(tx, project.id, project.ownerId),
           generationId: run.generationId,
           project: { name: project.name, brandBrief: brief },
           contents,

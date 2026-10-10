@@ -1,3 +1,4 @@
+import type { Prisma } from '../generated/prisma/client';
 import {
   ConflictException,
   Injectable,
@@ -63,8 +64,13 @@ export class ContentRepository {
     return content;
   }
 
-  async create(projectId: string, ownerId: string, input: CreateContentInput) {
-    return this.prisma.$transaction(async (tx) => {
+  async create(
+    projectId: string,
+    ownerId: string,
+    input: CreateContentInput,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const work = async (tx: Prisma.TransactionClient) => {
       const projects = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${ownerId} AND "deletedAt" IS NULL FOR UPDATE`;
@@ -87,7 +93,8 @@ export class ContentRepository {
         data: { ...input, projectId, status: 'DRAFT' },
         select,
       });
-    });
+    };
+    return transaction ? work(transaction) : this.prisma.$transaction(work);
   }
 
   async update(
@@ -95,8 +102,9 @@ export class ContentRepository {
     ownerId: string,
     id: string,
     input: UpdateContentInput,
+    transaction?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const work = async (tx: Prisma.TransactionClient) => {
       const projects = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${ownerId} AND "deletedAt" IS NULL FOR UPDATE`;
@@ -106,6 +114,14 @@ export class ContentRepository {
         select: { id: true, status: true, scheduledAt: true },
       });
       if (!content) throw new NotFoundException();
+      if (
+        await tx.publication.count({
+          where: { contentId: id, status: 'PUBLISHING' },
+        })
+      )
+        throw new ConflictException(
+          'Cannot change content while publication is active.',
+        );
       const conflict = (message: string) =>
         new ConflictException({
           code: 'CONFLICT',
@@ -167,6 +183,10 @@ export class ContentRepository {
       if (content.status === 'READY' && nextStatus === 'DRAFT')
         scheduledAt = null;
 
+      await tx.publication.updateMany({
+        where: { contentId: id, status: 'QUEUED' },
+        data: { status: 'CANCELLED' },
+      });
       return tx.contentItem.update({
         where: { id },
         data: {
@@ -179,7 +199,8 @@ export class ContentRepository {
         },
         select,
       });
-    });
+    };
+    return transaction ? work(transaction) : this.prisma.$transaction(work);
   }
 
   async delete(projectId: string, ownerId: string, id: string) {

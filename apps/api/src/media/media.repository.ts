@@ -1,3 +1,4 @@
+import type { Prisma } from '../generated/prisma/client';
 import {
   ConflictException,
   HttpException,
@@ -235,12 +236,14 @@ export class MediaRepository {
     ownerId: string,
     contentId: string,
     input: ReplaceContentAssetsInput,
+    transaction?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const work = async (tx: Prisma.TransactionClient) => {
       const project = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${ownerId} AND "deletedAt" IS NULL FOR UPDATE`;
       if (!project.length) throw new NotFoundException();
+      await tx.$queryRaw`SELECT id FROM "ContentItem" WHERE id=${contentId} AND "projectId"=${projectId} FOR UPDATE`;
       const content = await tx.contentItem.findFirst({
         where: { id: contentId, projectId },
         select: { status: true },
@@ -280,11 +283,10 @@ export class MediaRepository {
         where: { contentId, status: 'QUEUED' },
         data: { status: 'CANCELLED' },
       });
-      if (content.status !== 'DRAFT')
-        await tx.contentItem.update({
-          where: { id: contentId },
-          data: { status: 'DRAFT', scheduledAt: null },
-        });
+      await tx.contentItem.update({
+        where: { id: contentId },
+        data: { status: 'DRAFT', scheduledAt: null, updatedAt: new Date() },
+      });
       await tx.contentAsset.deleteMany({ where: { contentId } });
       if (input.assetIds.length)
         await tx.contentAsset.createMany({
@@ -300,6 +302,7 @@ export class MediaRepository {
         include: { asset: true },
       });
       return links.map((link) => link.asset);
-    });
+    };
+    return transaction ? work(transaction) : this.prisma.$transaction(work);
   }
 }

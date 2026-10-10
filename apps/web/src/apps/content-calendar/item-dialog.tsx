@@ -11,6 +11,7 @@ import { allChecked, ApproveChecklist } from "../content-studio/approve-checklis
 import { channelLabel } from "../content-studio/channels";
 import { NEXT_STATUSES, schedulePatch, STATUS_LABEL, type ContentStatus } from "../../lib/calendar-api";
 import { fromKey, toKey } from "../../lib/calendar-utils";
+import { isPublishing, usePublications } from "@/lib/integrations-api";
 import { PublishStatus } from "../integrations/publish-status";
 import { PostMedia } from "../media-library/post-media";
 import { channelColor } from "./channel-colors";
@@ -19,6 +20,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Mở một nội dung trên lịch: xem, duyệt, đổi trạng thái (DRAFT → READY → SCHEDULED → DONE) và ngày giờ. */
 export function ItemDialog({ item, onClose, onSave }: { item: ContentResponse; onClose: () => void; onSave: (status: ContentStatus, scheduledAt: string | null) => void }) {
+  // Đang đăng lên kênh: không đổi lịch/trạng thái (backend trả 409).
+  const publishing = isPublishing(usePublications(item.projectId).data, item.id);
   const initial = item.scheduledAt ? new Date(item.scheduledAt) : null;
   const [status, setStatus] = useState<ContentStatus>(item.status);
   const [date, setDate] = useState(initial ? toKey(initial) : "");
@@ -104,7 +107,7 @@ export function ItemDialog({ item, onClose, onSave }: { item: ContentResponse; o
           </Button>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="button" disabled={approving && !allChecked(checks)} onClick={save}>{approving ? "Approve" : "Save"}</Button>
+            <Button type="button" disabled={publishing || (approving && !allChecked(checks))} onClick={save}>{approving ? "Approve" : "Save"}</Button>
           </div>
         </DialogFooter>
       </DialogContent>
