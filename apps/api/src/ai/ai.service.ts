@@ -34,6 +34,9 @@ export class AiService {
   ) {
     const brief = await this.repository.brief(projectId, user.id);
     if (!brief) throw new NotFoundException('Brand Brief chưa được tạo.');
+    const references = user.features?.includes('personalization')
+      ? await this.repository.references(projectId, user.id)
+      : [];
     const briefSnapshot = {
       product: brief.product,
       audience: brief.audience,
@@ -61,7 +64,7 @@ export class AiService {
       businessAddress: brief.businessAddress,
       avoidWords: brief.avoidWords,
       single,
-      ...this.prompts.build(input, briefSnapshot, single),
+      ...this.prompts.build(input, briefSnapshot, single, references),
     };
   }
 

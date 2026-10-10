@@ -13,6 +13,7 @@ import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotaService, readAssistantUsage } from '../ai/quota.service';
 import { PLAN_LIMITS } from '../billing/plan-limits';
+import { textReferences } from '../references/references.service';
 
 const select = {
   id: true,
@@ -163,6 +164,7 @@ export class AssistantRepository {
       });
       return {
         generationId: generation.id,
+        references: await textReferences(tx, projectId, userId),
         userMessage,
         project,
         contents,
@@ -327,6 +329,18 @@ export class AssistantRepository {
       const action = actions.find((item) => item.id === actionId);
       if (!action) throw new NotFoundException();
       if (action.status !== 'proposed') throw conflict();
+      if (
+        await tx.assistantActionExecution.count({
+          where: {
+            messageId,
+            actionId,
+            status: {
+              in: status === 'applied' ? ['running', 'partial'] : ['running'],
+            },
+          },
+        })
+      )
+        throw conflict();
       action.status = status;
       return tx.assistantMessage.update({
         where: { id: messageId },

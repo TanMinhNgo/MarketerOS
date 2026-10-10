@@ -1,3 +1,4 @@
+import type { Prisma } from '../generated/prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { UpsertBrandBriefInput } from '@marketos/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,8 +11,13 @@ export class BrandRepository {
       where: { projectId, project: { ownerId, deletedAt: null } },
     });
   }
-  upsert(projectId: string, ownerId: string, data: UpsertBrandBriefInput) {
-    return this.prisma.$transaction(async (tx) => {
+  upsert(
+    projectId: string,
+    ownerId: string,
+    data: UpsertBrandBriefInput,
+    transaction?: Prisma.TransactionClient,
+  ) {
+    const work = async (tx: Prisma.TransactionClient) => {
       const projects = await tx.$queryRaw<
         { id: string }[]
       >`SELECT id FROM "Project" WHERE id = ${projectId} AND "ownerId" = ${ownerId} AND "deletedAt" IS NULL FOR UPDATE`;
@@ -21,6 +27,7 @@ export class BrandRepository {
         create: { ...data, projectId },
         update: data,
       });
-    });
+    };
+    return transaction ? work(transaction) : this.prisma.$transaction(work);
   }
 }

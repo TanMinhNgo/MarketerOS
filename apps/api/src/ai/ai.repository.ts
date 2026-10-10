@@ -8,6 +8,7 @@ import type { GenerateContentInput } from '@marketos/shared';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotaService, readTextUsage, textUsage } from './quota.service';
+import { textReferences } from '../references/references.service';
 
 @Injectable()
 export class AiRepository {
@@ -20,6 +21,10 @@ export class AiRepository {
     return this.prisma.brandBrief.findFirst({
       where: { projectId, project: { ownerId, deletedAt: null } },
     });
+  }
+
+  references(projectId: string, userId: string) {
+    return textReferences(this.prisma, projectId, userId);
   }
 
   reserve(

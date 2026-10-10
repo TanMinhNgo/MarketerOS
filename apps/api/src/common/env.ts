@@ -39,8 +39,21 @@ const EnvironmentSchema = z
     REDIS_URL: z.url({ protocol: /^rediss?$/ }).optional(),
     META_APP_ID: z.string().optional(),
     META_APP_SECRET: z.string().optional(),
+    INSTAGRAM_APP_ID: z.string().optional(),
+    INSTAGRAM_APP_SECRET: z.string().optional(),
     LINKEDIN_CLIENT_ID: z.string().optional(),
     LINKEDIN_CLIENT_SECRET: z.string().optional(),
+    SMTP_HOST: z.string().trim().optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURE: z.enum(['true', 'false']).default('false'),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    SMTP_FROM: z.email().optional().or(z.literal('')),
+    SMTP_FROM_NAME: z
+      .string()
+      .max(100)
+      .regex(/^[^\r\n]*$/)
+      .optional(),
     OAUTH_CALLBACK_BASE: z
       .url({ protocol: /^https?$/ })
       .optional()

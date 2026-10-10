@@ -245,8 +245,28 @@ model AssistantMessage {
   automation   Automation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now()) @db.Timestamptz(3)
 
+  executions AssistantActionExecution[]
+
   @@unique([generationId, role])
   @@index([projectId, createdAt, id])
+}
+
+model AssistantActionExecution {
+  id String @id @default(cuid())
+  messageId String
+  message AssistantMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  actionId String
+  imageRequestId String @unique
+  status String @default("pending")
+  contentId String?
+  assetId String?
+  baseDone Boolean @default(false)
+  targetAssetIds String[] @default([])
+  contentUpdatedAt DateTime? @db.Timestamptz(3)
+  lease String?
+  errorCode String?
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@unique([messageId, actionId])
 }
 
 model Automation {

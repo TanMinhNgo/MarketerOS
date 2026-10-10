@@ -193,3 +193,17 @@ export const UpdateAssistantActionSchema = z
 export type UpdateAssistantActionInput = z.infer<
   typeof UpdateAssistantActionSchema
 >;
+
+export const AssistantApplyResponseSchema = z
+  .object({
+    actionId: id,
+    status: z.enum(['pending', 'running', 'partial', 'applied']),
+    contentId: id.nullable(),
+    assetId: id.nullable(),
+    errorCode: z.string().nullable(),
+    updatedAt: z.iso.datetime(),
+  })
+  .strict();
+export type AssistantApplyResponse = z.infer<
+  typeof AssistantApplyResponseSchema
+>;

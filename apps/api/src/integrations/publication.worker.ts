@@ -1,5 +1,6 @@
 import {
   Injectable,
+  HttpException,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
@@ -11,6 +12,12 @@ import type { ContentItem, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationsService } from './integrations.service';
 import { ProviderError, ProviderGateway } from './provider.gateway';
+import { MediaStorage } from '../media/media.storage';
+import { SmtpService } from './smtp.service';
+import {
+  INTEGRATION_PROVIDERS,
+  type IntegrationChannel,
+} from '@marketos/shared';
 
 export function scheduledRequestId(
   contentId: string,
@@ -58,6 +65,8 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
     private readonly integrations: IntegrationsService,
     private readonly provider: ProviderGateway,
     private readonly clerk: ClerkGateway,
+    private readonly storage: MediaStorage,
+    private readonly smtp: SmtpService,
   ) {}
   async onModuleInit() {
     const url = new URL(this.config.getOrThrow<string>('REDIS_URL'));
@@ -132,26 +141,16 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
         scheduledAt: { lte: now },
         AND: [
           {
-            OR: [
-              {
-                channel: 'FACEBOOK',
-                project: {
-                  deletedAt: null,
-                  channelConnections: {
-                    some: { channel: 'FACEBOOK', status: 'CONNECTED' },
-                  },
-                },
+            // shortcut: Email needs an explicit recipient; add scheduling when recipient configuration is persisted.
+            OR: INTEGRATION_PROVIDERS.filter(
+              ({ channel }) => channel !== 'EMAIL',
+            ).map(({ channel }) => ({
+              channel,
+              project: {
+                deletedAt: null,
+                channelConnections: { some: { channel, status: 'CONNECTED' } },
               },
-              {
-                channel: 'LINKEDIN',
-                project: {
-                  deletedAt: null,
-                  channelConnections: {
-                    some: { channel: 'LINKEDIN', status: 'CONNECTED' },
-                  },
-                },
-              },
-            ],
+            })),
           },
           ...(this.scanCursor
             ? [
@@ -188,6 +187,7 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
         channel: content.channel,
         status: 'CONNECTED',
       },
+      include: { project: { select: { ownerId: true } } },
     });
     if (!connection) return;
     const inFlight = await this.prisma.publication.count({
@@ -198,22 +198,19 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
     });
     if (inFlight) return;
     try {
-      await this.prisma.publication.create({
-        data: {
-          contentId: content.id,
-          connectionId: connection.id,
-          requestId: scheduledRequestId(content.id, content.scheduledAt!),
-          scheduledAt: content.scheduledAt,
-          payloadSnapshot: {
-            title: content.title,
-            body: content.body,
-            hashtags: content.hashtags,
-            cta: content.cta,
-          },
-          status: 'QUEUED',
-        },
-      });
+      await this.integrations.publish(
+        content.projectId,
+        connection.project.ownerId,
+        content.id,
+        scheduledRequestId(content.id, content.scheduledAt!),
+        content.scheduledAt!,
+      );
     } catch (error) {
+      if (
+        error instanceof HttpException &&
+        [404, 409].includes(error.getStatus())
+      )
+        return;
       if (
         typeof error === 'object' &&
         error !== null &&
@@ -294,7 +291,8 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
     }
     if (
       row.scheduledAt &&
-      !isPublishable(row.content.status, row.scheduledAt, new Date())
+      (row.content.scheduledAt?.getTime() !== row.scheduledAt.getTime() ||
+        !isPublishable(row.content.status, row.scheduledAt, new Date()))
     ) {
       return 'CONTENT_REJECTED';
     }
@@ -334,11 +332,22 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
       await this.failPublication(row, 'PERMISSION_DENIED');
       return;
     }
+    if (connection.channel === 'EMAIL') {
+      const snapshot = row.payloadSnapshot as { email?: unknown };
+      const result = await this.smtp.send(
+        snapshot.email,
+        row.id,
+        connection.externalAccountId,
+      );
+      await this.recordPublished(row, result);
+      return;
+    }
     const token = await this.integrations.credential(connection.id);
     const snapshot = row.payloadSnapshot as {
       body?: string;
       hashtags?: string[];
       cta?: string | null;
+      assetIds?: string[];
     };
     const body = [
       snapshot.body,
@@ -353,11 +362,43 @@ export class PublicationWorker implements OnModuleInit, OnModuleDestroy {
       await this.failPublication(row, 'CONTENT_REJECTED');
       return;
     }
+    const assetIds = snapshot.assetIds ?? [];
+    if (
+      !Array.isArray(assetIds) ||
+      assetIds.length > 10 ||
+      assetIds.some((id) => typeof id !== 'string') ||
+      new Set(assetIds).size !== assetIds.length
+    )
+      throw new ProviderError('CONTENT_REJECTED');
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        id: { in: assetIds },
+        projectId: connection.projectId,
+        kind: 'IMAGE',
+      },
+      select: { id: true, storageKey: true, altText: true },
+    });
+    if (assets.length !== assetIds.length)
+      throw new ProviderError('CONTENT_REJECTED');
+    const images = [];
+    const imageUrls = [];
+    for (const id of assetIds) {
+      const asset = assets.find((item) => item.id === id)!;
+      if (connection.channel === 'INSTAGRAM')
+        imageUrls.push(await this.storage.instagramImageUrl(asset.storageKey));
+      else
+        images.push({
+          bytes: await this.storage.publicationImage(asset.storageKey),
+          altText: asset.altText,
+        });
+    }
     const result = await this.provider.publish(
-      connection.channel as 'FACEBOOK' | 'LINKEDIN',
+      connection.channel as Exclude<IntegrationChannel, 'EMAIL'>,
       connection.externalAccountId,
       token,
       body,
+      images,
+      ...(connection.channel === 'INSTAGRAM' ? [imageUrls] : []),
     );
     await this.recordPublished(row, result);
   }

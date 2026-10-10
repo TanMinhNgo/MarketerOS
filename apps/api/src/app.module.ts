@@ -16,6 +16,9 @@ import { AiModule } from './ai/ai.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { MediaModule } from './media/media.module';
+import { ReferencesController } from './references/references.controller';
+import { ReferencesService } from './references/references.service';
+import { AlertsController } from './alerts/alerts.controller';
 
 @Module({
   imports: [
@@ -37,7 +40,7 @@ import { MediaModule } from './media/media.module';
     IntegrationsModule,
     MediaModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, ReferencesController, AlertsController],
+  providers: [AppService, ReferencesService],
 })
 export class AppModule {}
