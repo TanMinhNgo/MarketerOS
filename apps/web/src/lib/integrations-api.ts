@@ -10,6 +10,7 @@ import {
   IntegrationProvidersResponseSchema,
   type IntegrationProvider,
   type ContentResponse,
+  type PublishInput,
 } from "@marketos/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
@@ -22,7 +23,7 @@ export type Provider = IntegrationProvider;
 export type ConnectionProvider = z.infer<typeof IntegrationProvidersResponseSchema>["items"][number];
 
 /** Kênh có adapter xuất bản; Instagram yêu cầu ít nhất một ảnh. */
-export const PUBLISHABLE = { FACEBOOK: "facebook", INSTAGRAM: "instagram", LINKEDIN: "linkedin" } as const satisfies Partial<Record<Connection["channel"], Provider>>;
+export const PUBLISHABLE = { FACEBOOK: "facebook", INSTAGRAM: "instagram", LINKEDIN: "linkedin", EMAIL: "smtp" } as const satisfies Partial<Record<Connection["channel"], Provider>>;
 export const isPublishable = (channel: string): channel is Connection["channel"] => channel in PUBLISHABLE;
 
 export const ERROR_TEXT: Record<NonNullable<Publication["errorCode"]>, string> = {
@@ -100,8 +101,9 @@ export function usePublishNow(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     meta: { silent: true },
-    mutationFn: async (content: Pick<ContentResponse, "id">) => {
-      const res = await request(`${base(projectId)}/contents/${content.id}/publish`, { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() } });
+    /** `key`: giữ nguyên khi thử lại cùng một lần gửi (mất kết nối), tạo mới khi chủ động gửi lần mới. Email cần `email.to`; mạng xã hội không có body. */
+    mutationFn: async ({ content, key, email }: { content: Pick<ContentResponse, "id">; key: string; email?: PublishInput["email"] }) => {
+      const res = await request(`${base(projectId)}/contents/${content.id}/publish`, { method: "POST", headers: { "Idempotency-Key": key }, body: email ? { email } : undefined });
       return PublicationSchema.parse(await res.json());
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: publicationsKey(projectId) }),

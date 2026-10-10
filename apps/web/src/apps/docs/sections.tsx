@@ -362,6 +362,9 @@ export const SECTIONS: DocSection[] = [
           ]}
         />
         <Callout kind="note">A post goes out with its text and up to 10 images, in the order you set. Before <strong>Publish now</strong> you see exactly what will be posted. While a post is being published you can&apos;t edit it. Instagram posts need at least one image. TikTok and YouTube aren&apos;t supported yet.</Callout>
+        <H>Email</H>
+        <P>If your MarketOS server has an email (SMTP) account set up, connect <strong>Email</strong> in Integrations. On an approved Email post, press <strong>Send email</strong>, type one recipient and check the preview (from, to, subject and text) before sending.</P>
+        <Callout kind="note">Emails are plain text: no images or hashtags, and fill in any text in brackets first. They are never sent automatically, even when scheduled. &ldquo;Accepted by SMTP&rdquo; means your email provider took the message, not that it reached the inbox. If a send fails, check your provider before sending again.</Callout>
       </>
     ),
   },
